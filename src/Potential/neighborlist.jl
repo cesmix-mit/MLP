@@ -32,32 +32,34 @@ function neighborlist(r, rcut, nx)
 
     rcutsq = rcut*rcut
     dim, N = size(r);
-    numneigh = zeros(Int64,nx)
-    ai = zeros(Int64,nx*N)
-    aj = zeros(Int64,nx*N)
-    k = 0
-    for i = 1:nx
-        ri = r[:,i]
-        inc = 0
-        for j = 1:N
-            rj = r[:,j]
-            rij = ri - rj
-            rijsq = rij[1]*rij[1] + rij[2]*rij[2] + rij[3]*rij[3]
-            if  (rijsq > 1e-12) & (rijsq <= rcutsq)    
-                inc += 1           
-                k += 1           
-                ai[k] = i
-                aj[k] = j                                                      
-            end
-        end
-        numneigh[i] = inc 
-    end
+    numneigh = zeros(Int32,nx)
+    ai = zeros(Int32,nx*N)
+    aj = zeros(Int32,nx*N)
 
+    # k = 0
+    # for i = 1:nx
+    #     ri = r[:,i]
+    #     inc = 0
+    #     for j = 1:N
+    #         rj = r[:,j]
+    #         rij = ri - rj
+    #         rijsq = rij[1]*rij[1] + rij[2]*rij[2] + rij[3]*rij[3]
+    #         if  (rijsq > 1e-12) & (rijsq <= rcutsq)    
+    #             inc += 1           
+    #             k += 1           
+    #             ai[k] = i
+    #             aj[k] = j                                                      
+    #         end
+    #     end
+    #     numneigh[i] = inc 
+    # end
+
+    k = podneighborlist(ai, aj, numneigh, r, rcutsq, Int32(nx), Int32(N), Int32(dim));
+    
     ai = ai[1:k]
     aj = aj[1:k]
-
+    
     return ai, aj, numneigh
-
 end
 
 

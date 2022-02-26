@@ -308,14 +308,20 @@ function radialbasis2(rij, rin, rcut, scalefac, pdegree, K)
     nbf = pdegree*M + K
     rbf = zeros(N, nbf);
     drbf = zeros(dim, N, nbf);
-
+    
     rmax = rcut - rin
     for n = 1:N
         dij = sqrt(rij[1,n]*rij[1,n] + rij[2,n]*rij[2,n] + rij[3,n]*rij[3,n])    
-        dr = rij[:,n]/dij;        
+        #dr = rij[:,n]/dij;        
+        dr1 = rij[1,n]/dij;    
+        dr2 = rij[2,n]/dij;    
+        dr3 = rij[3,n]/dij;    
         r = dij - rin        
-        fcut,dfcut = cutoffderiv(dij, rin, rcut, epsil) 
-
+        #fcut,dfcut = cutoffderiv(dij, rin, rcut, epsil) 
+        y = r/rmax;    
+        fcut = exp(-1.0/sqrt((1.0 - y^3)^2 + epsil))/exp(-1.0);
+        dfcut = ((3.0/(rmax*exp(-1.0)))*(y^2)*exp(-1.0/(epsil + (y^3 - 1.0)^2)^(1/2))*(y^3 - 1.0))/(epsil + (y^3 - 1.0)^2)^(3/2);
+    
         for j = 1:M
             alpha = scalefac[j];    
             if alpha == 0
@@ -327,8 +333,11 @@ function radialbasis2(rij, rin, rcut, scalefac, pdegree, K)
             for i = 1:pdegree    
                 a = i*pi;
                 rbf[n,i+(j-1)*pdegree] = (sqrt(2.0/(rmax))/i)*fcut*sin(a*x)/r;
-                drbfdr = (sqrt(2/rmax)/i)*(dfcut*sin(a*x)/r - fcut.*sin(a*x)/(r^2) + a*cos(a*x)*fcut*dx/r);
-                drbf[:,n,i+(j-1)*pdegree] = drbfdr*dr;
+                drbfdr = (sqrt(2/rmax)/i)*(dfcut*sin(a*x)/r - fcut*sin(a*x)/(r^2) + a*cos(a*x)*fcut*dx/r);
+                #drbf[:,n,i+(j-1)*pdegree] = drbfdr*dr;
+                drbf[1,n,i+(j-1)*pdegree] = drbfdr*dr1;
+                drbf[2,n,i+(j-1)*pdegree] = drbfdr*dr2;
+                drbf[3,n,i+(j-1)*pdegree] = drbfdr*dr3;
             end
         end
 
@@ -337,7 +346,10 @@ function radialbasis2(rij, rin, rcut, scalefac, pdegree, K)
             p = pdegree*M+i;
             rbf[n,p] = fcut/(dij^i);
             drbfdr = dfcut/(dij^i) - i*fcut/(dij^(i+1));  
-            drbf[:,n,p] = drbfdr*dr;
+            #drbf[:,n,p] = drbfdr*dr;
+            drbf[1,n,p] = drbfdr*dr1;
+            drbf[2,n,p] = drbfdr*dr2;
+            drbf[3,n,p] = drbfdr*dr3;
         end
     end
     
@@ -471,7 +483,7 @@ end
 function cosinbasis(xij, xik, nabf, theta0)
 
     dim, N = size(xij);
-    n0 =length(theta0)
+    n0 = length(theta0)
     abf  = zeros(N, n0*nabf)
     dabf  = zeros(6, N, n0*nabf)        
 
@@ -529,6 +541,65 @@ function cosinbasis(xij, xik, nabf, theta0)
     return abf, dabf 
 end
 
+function cosinbasis!(abf, dabf, xij, xik, nabf, theta0)
+
+    dim, N = size(xij);
+    n0 = length(theta0)
+    # abf  = zeros(N, n0*nabf)
+    # dabf  = zeros(6, N, n0*nabf)        
+
+    for n = 1:N
+        xij1 = xij[1,n]
+        xij2 = xij[2,n]
+        xij3 = xij[3,n]
+        xik1 = xik[1,n]
+        xik2 = xik[2,n]
+        xik3 = xik[3,n]
+
+        xdot  = xij1*xik1 + xij2*xik2 + xij3*xik3;
+        rijsq = xij1*xij1 + xij2*xij2 + xij3*xij3;    
+        riksq = xik1*xik1 + xik2*xik2 + xik3*xik3;    
+        rij = sqrt(rijsq); 
+        rik = sqrt(riksq); 
+
+        costhe = xdot/(rij*rik);    
+        #ind = findall(abs.(costhe) .>= 1.0)
+        #costhe[ind] = 1.0*sign.(costhe[ind])
+        if abs(costhe) > 1.0
+            costhe = 1.0*sign(costhe)
+        end 
+        xdot = costhe*(rij*rik)
+
+        sinthe = sqrt(1 - costhe*costhe);
+        sinthe = max(sinthe, 1e-12)    
+        theta = acos(costhe)            
+        dtheta = -1.0/sinthe 
+
+        tm1 = (rijsq^(3/2))*(riksq^(1/2));
+        tm2 = (rijsq^(1/2))*(riksq^(3/2));
+        dct1 = (xik1*rijsq - xij1*xdot)/tm1; 
+        dct2 = (xik2*rijsq - xij2*xdot)/tm1;
+        dct3 = (xik3*rijsq - xij3*xdot)/tm1;
+        dct4 = (xij1*riksq - xik1*xdot)/tm2;
+        dct5 = (xij2*riksq - xik2*xdot)/tm2;
+        dct6 = (xij3*riksq - xik3*xdot)/tm2;
+
+        for j = 1:n0
+            for p = 1:nabf        
+                q = p + (j-1)*nabf
+                abf[n,q] = cos(p*theta + theta0[j]);                
+                tm = -p*sin(p*theta + theta0[j])*dtheta
+                dabf[1,n,q] = tm*dct1;
+                dabf[2,n,q] = tm*dct2;
+                dabf[3,n,q] = tm*dct3;
+                dabf[4,n,q] = tm*dct4;
+                dabf[5,n,q] = tm*dct5;
+                dabf[6,n,q] = tm*dct6;
+            end
+        end
+    end
+end
+
 function angulardescriptors(x, t, a, b, c, pbc, rcutmax, pod::PODdesc)
         
     dim, N = size(x)
@@ -554,18 +625,28 @@ function angulardescriptors(x, t, a, b, c, pbc, rcutmax, pod::PODdesc)
 
     #@time begin
     rij,~ = neighpairs(y, [], pairlist, pairnum, t, ilist, alist);                
+    #end
+    #@time begin
     e2ij, f2ij = radialbasis2(rij, pod.rin, pod.rcut, pod.gamma0, pod.pdegree[1], pod.pdegree[2])
+    #end
+    #@time begin
     e2ij = e2ij*pod.Phi 
     nm, nrbf = size(pod.Phi)    
     nn = size(e2ij,1)
     f2ij = reshape(reshape(f2ij,(3*nn,nm))*pod.Phi, (3, nn, nrbf)) 
     uij, uik, wij, wik = makejk(e2ij, f2ij, pairnum, tripletnum, ilist)
     #end
-
-    #@time begin
-    uijk, wijk = cosinbasis(xij, xik, pod.pdegree[3], pod.theta0)
+    
+    #@time begin    
+    nabf = pod.pdegree[3]
+    n0 = length(pod.theta0)     
+    N = size(xij,2)
+    uijk  = zeros(N, n0*nabf)
+    wijk  = zeros(6, N, n0*nabf)        
+    cosinbasis!(uijk, wijk, xij, xik, pod.pdegree[3], pod.theta0)
     #end
 
+    #@time begin
     nabf = size(uijk,2)
     M = nrbf*(nabf+1)  
     N = size(uij,1)    
@@ -574,8 +655,7 @@ function angulardescriptors(x, t, a, b, c, pbc, rcutmax, pod::PODdesc)
     natom = size(x,2)
     eatom = zeros(natom,M)
     fatom = zeros(3,natom,M)
-    vatom = zeros(6,natom,M)
-    #@time begin
+    vatom = zeros(6,natom,M)    
     for n = 1:N
         K = 0
         for m = 1:(nrbf)
@@ -631,14 +711,24 @@ function angulardescriptors(x, t, a, b, c, pbc, rcutmax, pod::PODdesc)
 
             for p = 1:(nabf)                
                 K = K + 1                
-                eijk = uij[n,m]*uik[n,m]*uijk[n,p];
-                fij[1] = wij[1,n,m]*uik[n,m]*uijk[n,p] + uij[n,m]*uik[n,m]*wijk[1,n,p];
-                fij[2] = wij[2,n,m]*uik[n,m]*uijk[n,p] + uij[n,m]*uik[n,m]*wijk[2,n,p];
-                fij[3] = wij[3,n,m]*uik[n,m]*uijk[n,p] + uij[n,m]*uik[n,m]*wijk[3,n,p];
-                fik[1] = uij[n,m]*wik[1,n,m]*uijk[n,p] + uij[n,m]*uik[n,m]*wijk[4,n,p];
-                fik[2] = uij[n,m]*wik[2,n,m]*uijk[n,p] + uij[n,m]*uik[n,m]*wijk[5,n,p];
-                fik[3] = uij[n,m]*wik[3,n,m]*uijk[n,p] + uij[n,m]*uik[n,m]*wijk[6,n,p];
-           
+                # eijk = uij[n,m]*uik[n,m]*uijk[n,p];
+                # fij[1] = wij[1,n,m]*uik[n,m]*uijk[n,p] + uij[n,m]*uik[n,m]*wijk[1,n,p];
+                # fij[2] = wij[2,n,m]*uik[n,m]*uijk[n,p] + uij[n,m]*uik[n,m]*wijk[2,n,p];
+                # fij[3] = wij[3,n,m]*uik[n,m]*uijk[n,p] + uij[n,m]*uik[n,m]*wijk[3,n,p];
+                # fik[1] = uij[n,m]*wik[1,n,m]*uijk[n,p] + uij[n,m]*uik[n,m]*wijk[4,n,p];
+                # fik[2] = uij[n,m]*wik[2,n,m]*uijk[n,p] + uij[n,m]*uik[n,m]*wijk[5,n,p];
+                # fik[3] = uij[n,m]*wik[3,n,m]*uijk[n,p] + uij[n,m]*uik[n,m]*wijk[6,n,p];
+                ujk = uij[n,m]*uik[n,m]    
+                uk = uik[n,m]*uijk[n,p]
+                uj = uij[n,m]*uijk[n,p]
+                eijk = ujk*uijk[n,p];
+                fij[1] = wij[1,n,m]*uk + ujk*wijk[1,n,p];
+                fij[2] = wij[2,n,m]*uk + ujk*wijk[2,n,p];
+                fij[3] = wij[3,n,m]*uk + ujk*wijk[3,n,p];
+                fik[1] = wik[1,n,m]*uj + ujk*wijk[4,n,p];
+                fik[2] = wik[2,n,m]*uj + ujk*wijk[5,n,p];
+                fik[3] = wik[3,n,m]*uj + ujk*wijk[6,n,p];
+                
                 v0 = xij[1,n]*fij[1] + xik[1,n]*fik[1];
                 v1 = xij[2,n]*fij[2] + xik[2,n]*fik[2];        
                 v2 = xij[3,n]*fij[3] + xik[3,n]*fik[3];
@@ -684,12 +774,33 @@ function angulardescriptors(x, t, a, b, c, pbc, rcutmax, pod::PODdesc)
     end
     #end
 
+    # ai = Int32.(ai.-1)
+    # aj = Int32.(aj.-1)
+    # ak = Int32.(ak.-1)    
+    # podtally3(eatom, fatom, vatom, xij, xik, uij, uik, uijk, wij, wik, wijk, 
+    #         ai, aj, ak, Int32(nrbf), Int32(nabf), Int32(natom), Int32(N));
+        
+    # eatom2 = zeros(natom,M)
+    # fatom2 = zeros(3,natom,M)
+    # vatom2 = zeros(6,natom,M)    
+    # ai = Int32.(ai.-1)
+    # aj = Int32.(aj.-1)
+    # ak = Int32.(ak.-1)
+    # @time begin
+    # podtally3(eatom2, fatom2, vatom2, xij, xik, uij, uik, uijk, wij, wik, wijk, 
+    #         ai, aj, ak, Int32(nrbf), Int32(nabf), Int32(natom), Int32(N));
+    # end
+    # display(maximum(abs.(eatom[:]-eatom2[:])))
+    # display(maximum(abs.(fatom[:]-fatom2[:])))
+    # display(maximum(abs.(vatom[:]-vatom2[:])))
+    # podtally3(eatom, fatom, vatom, xij, xik, uij, uik, uijk, wij, wik, wijk, ai, aj, ak, 
+    #     nrbf, nabf, natom, N);
+
     d = sum(eatom, dims=1)
     d = d[:]
     dd = fatom 
     dv = (-1.0/3.0)*reshape(sum(vatom, dims=2), (6,M))
 
-    #display("here")
     return d, dd, dv 
 end
 

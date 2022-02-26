@@ -485,11 +485,13 @@ function maespace(traindata, validdata, descriptors, potential, Doptions, optim:
     for n = 1:neta
         optim.eta[1:meta] = eta[n,:]
         descriptors = setcutoff(descriptors, optim.eta)      
+        @time begin
         coeff,~ = linearfit(trainconfig, descriptors, potential, Doptions, optim)
         if n==1
             display(size(coeff))
         end
         eerr, ferr, serr = validate(validconfig, descriptors, potential, Doptions, optim, coeff)    
+        end
         emae[n] = eerr[1]
         fmae[n] = ferr[1]
         smae[n] = serr[1]                

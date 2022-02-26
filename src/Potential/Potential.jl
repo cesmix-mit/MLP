@@ -112,6 +112,7 @@ include("neighquadlets.jl");
 include("empiricalpotential.jl");
 include("empiricaldescriptors.jl");
 include("tally.jl");
+include("podcpp.jl");
 include("PODdescriptors.jl");
 include("snastruct.jl");
 include("snapcpp.jl");

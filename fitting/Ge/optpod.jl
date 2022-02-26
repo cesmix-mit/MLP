@@ -4,7 +4,7 @@ include(MLPpath * "src/setup.jl");
 using DelimitedFiles
 
 # path to the database 
-datapath = "../../data/Ge/"
+datapath = "/Users/ngoccuongnguyen/Dropbox (MIT)/Research/Software/MLP/data/Ge/" #"../../data/Ge/"
 dataformat = "jsonpymatgen"
 fileextension = "json"
 atomspecies = ["Ge"];
@@ -56,7 +56,7 @@ rcut = 5.0
 rin = 0.9
 
 # bounds for cut-off radius to be optimized
-rcutrange = [4.25, 5.5]
+rcutrange = [5.25, 5.5]
 
 # bounds for inner radius to be optimized
 rinrange = [0.9, 1.5]
@@ -78,7 +78,7 @@ descriptors[1] = POD(nbody=1, pdegree=[0], nbasis = [1], rin = rin, rcut=rcut)
 
 # Bessel scaling parameters
 gamma = [0.0, 2, 4]
-for j = 0:5
+for j = 3:3
     
     # POD Descriptors
     if j == 0
