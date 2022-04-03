@@ -58,7 +58,7 @@ rcut = 5.0
 rin = 0.9
 
 # bounds for cut-off radius to be optimized
-rcutrange = [4.25, 5.5]
+rcutrange = [5.25, 5.5]
 
 # bounds for inner radius to be optimized
 rinrange = [0.9, 1.5]

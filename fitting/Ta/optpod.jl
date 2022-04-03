@@ -91,7 +91,7 @@ descriptors[1] = POD(nbody=1, pdegree=[0], nbasis = [1], rin = rin, rcut=rcut)
 
 # Bessel scaling parameters
 gamma = [0.0, 2, 4]
-for j = 3:3
+for j = 0:5
     
     # POD Descriptors
     if j == 0
@@ -134,12 +134,12 @@ for j = 3:3
     podloss = [etaout fout]
 
     Preprocessing.mkfolder("results")
-    writedlm("results/optpodcoeff" * string(j) *  ".txt", coeff)
-    writedlm("results/optpodpolycoeff" * string(j) *  ".txt", polycoeff)
-    writedlm("results/optpodtrainerror" * string(j) *  ".txt", [energyerrors forceerrors])    
+    writedlm("results/optpodcoeff" * string(6+j) *  ".txt", coeff)
+    writedlm("results/optpodpolycoeff" * string(6+j) *  ".txt", polycoeff)
+    writedlm("results/optpodtrainerror" * string(6+j) *  ".txt", [energyerrors forceerrors])    
     #writedlm("results/optpodtesterror" * string(j) *  ".txt", [energytesterrors forcetesterrors])    
-    writedlm("results/optpodeta" * string(j) *  ".txt", opteta)
-    writedlm("results/optpodlossfunction" * string(j) *  ".txt", podloss)
+    writedlm("results/optpodeta" * string(6+j) *  ".txt", opteta)
+    writedlm("results/optpodlossfunction" * string(6+j) *  ".txt", podloss)
 end
 
 

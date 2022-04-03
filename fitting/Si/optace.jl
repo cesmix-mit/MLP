@@ -88,7 +88,7 @@ for j = 3:3
     
     # ACE acedescriptors
     if j == 0
-        acedescriptors[2] = ACEpot.ACEparams(species = [:Cu], nbody=4, pdegree=5, r0=ACEpot.rnn(:Ge), rcut=rcut, rin=rin, wL=1.75, csp=1.5)
+        acedescriptors[2] = ACEpot.ACEparams(species = [:Si], nbody=3, pdegree=6, r0=ACEpot.rnn(:Si), rcut=rcut, rin=rin, wL=2.0, csp=1.75)
     elseif j == 1
         acedescriptors[2] = ACEpot.ACEparams(species = [:Si], nbody=4, pdegree=8, r0=ACEpot.rnn(:Si), rcut=rcut, rin=rin, wL=1.75, csp=1.5)
     elseif j==2

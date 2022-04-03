@@ -24,7 +24,7 @@ function loadsnap(mdppath::String)
     if libexist==0            
         cdir = pwd();
         cd(mdppath * "src/Potential")        
-        cstr = `g++ -std=c++11 -Wall -Wextra -pedantic -c -fPIC cpuSnap.cpp -o cpusnap.o`                
+        cstr = `g++ -std=c++11 -O3 -Wall -Wextra -pedantic -c -fPIC cpuSnap.cpp -o cpusnap.o`                
         run(cstr)
         if Sys.isapple()            
             cstr = `g++ -shared cpusnap.o -o cpuSnap.dylib`            
@@ -630,6 +630,7 @@ function snapdescriptors(x, t, a, b, c, pbc, sna::SnaStruct)
     rij, ai, aj, ti, tj = neighpairs(y, pairlist, pairnum, atomtype, ilist, alist);                
     ijnum = pairnum[end]
 
+    if ijnum>0
     # offset 1 for C++ code
     ilist = ilist .- Int32(1)
     alist = alist .- Int32(1)
@@ -704,6 +705,404 @@ function snapdescriptors(x, t, a, b, c, pbc, sna::SnaStruct)
 
     blist = reshape(blist, (N, idxb_max*ntriples)) 
     dblist = reshape(dblist, (ijnum, dim, idxb_max*ntriples)) 
+
+    end
+
+    if ijnum==0
+    bi = zeros(ntypes*ncoeff)        
+    bd = zeros(3,N,ntypes*ncoeff)
+    bv = zeros(6,ntypes*ncoeff)    
+    blist = zeros(N, idxb_max*ntriples)
+    dblist = zeros(ijnum, dim, idxb_max*ntriples)    
+    end
+
     return bi, bd, bv, blist, dblist, ai, aj, pairnum             
 end
 
+
+function snaponebodyefatom(x, t, a, b, c, pbc, descriptors)
+
+    dim, N = size(x)
+    M = length(descriptors.species)    
+    eatom = zeros(N,M)
+    for m = 1:M
+        ind = findall(t[:] .== m);
+        eatom[ind,m] .= 1.0
+    end
+    fatom = zeros(dim*N,M)
+
+    return eatom, fatom 
+end
+
+function snaptwobodyefatom(x, t, a, b, c, pbc, descriptors)
+    return nothing
+end
+
+function snapthreebodyefatom(x, t, a, b, c, pbc, descriptors)
+    return nothing
+end
+
+function snapfourbodyefatom(x, t, a, b, c, pbc, sna)
+
+    dim, N = size(x)
+    
+    #idxcg_max = sna.idxcg_max;
+    idxu_max = sna.idxu_max;
+    idxb_max = sna.idxb_max;
+    idxz_max = sna.idxz_max;    
+    twojmax = sna.twojmax;
+    ncoeff = sna.ncoeff;
+    #ncoeffall = sna.ncoeffall;
+    ntypes = sna.ntypes;
+    nelem = sna.nelements;    
+    ndoubles = sna.ndoubles;   
+    ntriples = sna.ntriples;   
+    #nperdim = sna.nperdim;
+    bnormflag = sna.bnormflag;
+    chemflag = sna.chemflag;    
+    quadraticflag = sna.quadraticflag;
+    switchflag = sna.switchflag;    
+    bzeroflag = sna.bzeroflag;
+    wselfallflag = sna.wselfallflag;        
+
+    map = sna.map;
+    idxz = sna.idxz;
+    idxz_block = sna.idxz_block;
+    idxb = sna.idxb;
+    #idxb_block = sna.idxb_block;
+    idxu_block = sna.idxu_block;
+    idxcg_block = sna.idxcg_block;   
+    
+    rcutmax = sna.rcutmax
+    wself = sna.wself;
+    rmin0 = sna.rmin0;
+    rfac0 = sna.rfac0;
+    rcutfac = sna.rcutfac;
+    rcutmax = sna.rcutmax;        
+    bzero = sna.bzero;
+    rootpqarray = sna.rootpqarray;
+    cglist = sna.cglist;
+    rcutsq = sna.rcutsq;    
+    radelem = sna.radelem;
+    wjelem = sna.wjelem; 
+    #coeffelem = sna.coeffelem;                   
+
+    y, alist, neighlist, neighnum = fullneighborlist(x, a, b, c, pbc, rcutmax);
+    ilist = Int32.(Array(1:N));   
+    atomtype = Int32.(t[:])
+    alist = Int32.(alist)
+    neighlist = Int32.(neighlist)
+    neighnum = Int32.(neighnum)
+    
+    pairlist, pairnum = neighpairlist(y, ilist, alist, atomtype, neighlist, neighnum, rcutsq, ntypes)    
+    rij, ai, aj, ti, tj = neighpairs(y, pairlist, pairnum, atomtype, ilist, alist);                
+    ijnum = pairnum[end]
+
+    if ijnum>0
+    # offset 1 for C++ code
+    ilist = ilist .- Int32(1)
+    alist = alist .- Int32(1)
+    ai = ai .- Int32(1)
+    aj = aj .- Int32(1)
+
+    n = idxu_max*ijnum
+    ulist_r = zeros(n)
+    ulist_i = zeros(n)
+    dulist_r = zeros(3*n)
+    dulist_i = zeros(3*n)    
+    ccall(Libdl.dlsym(snaplib, :cpuComputeUij), Cvoid, (Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble},
+        Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Cdouble, Cdouble, 
+        Cdouble, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint, Cint), 
+        ulist_r, ulist_i, dulist_r, dulist_i, rootpqarray, rij, wjelem, radelem, rmin0, 
+        rfac0, rcutfac, idxu_block, ti, tj, twojmax, idxu_max, ijnum, switchflag)    
+
+    ulisttot_r = zeros(N*idxu_max*nelem)
+    ulisttot_i = zeros(N*idxu_max*nelem)
+    ccall(Libdl.dlsym(snaplib, :cpuZeroUarraytot2), Cvoid, (Ptr{Cdouble}, Ptr{Cdouble}, Cdouble, 
+        Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint},  Cint, Cint, Cint, Cint, Cint, Cint), 
+        ulisttot_r, ulisttot_i, wself, idxu_block, atomtype, map, ai, wselfallflag, chemflag, 
+        idxu_max, nelem, twojmax, N)    
+
+    ccall(Libdl.dlsym(snaplib, :cpuAddUarraytot), Cvoid, (Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, 
+        Ptr{Cdouble}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint, Cint), 
+        ulisttot_r, ulisttot_i, ulist_r, ulist_i, map, ai, tj, idxu_max, N, ijnum, chemflag)    
+
+    zlist_r = zeros(idxz_max*ndoubles*N)
+    zlist_i = zeros(idxz_max*ndoubles*N)
+    ccall(Libdl.dlsym(snaplib, :cpuComputeZi2), Cvoid, (Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, 
+        Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint, Cint, Cint, Cint), 
+        zlist_r, zlist_i, ulisttot_r, ulisttot_i, cglist, idxz, idxu_block, idxcg_block, twojmax, 
+        idxu_max, idxz_max, nelem, bnormflag, N)    
+
+    blist = zeros(idxb_max*ntriples*N)
+    ccall(Libdl.dlsym(snaplib, :cpuComputeBi2), Cvoid, (Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, 
+        Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, 
+        Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint), 
+        blist, zlist_r, zlist_i, ulisttot_r, ulisttot_i, bzero, ilist, atomtype, 
+        map, idxb, idxu_block, idxz_block, twojmax, idxb_max, idxu_max, idxz_max, 
+        nelem, bzeroflag, wselfallflag, chemflag, N)    
+    
+    dblist = zeros(idxb_max*ntriples*dim*ijnum)          
+    ccall(Libdl.dlsym(snaplib, :cpuComputeDbidrj), Cvoid, (Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, 
+        Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, 
+        Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint), 
+        dblist, zlist_r, zlist_i, dulist_r, dulist_i, idxb, idxu_block, idxz_block, map, ai, tj, 
+        twojmax, idxb_max, idxu_max, idxz_max, nelem, bnormflag, chemflag, N, ijnum)    
+    
+    bi = zeros(ntypes*ncoeff)
+    ccall(Libdl.dlsym(snaplib, :cpuSnapTallyBispectrum), Cvoid, (Ptr{Cdouble}, Ptr{Cdouble},  
+        Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint, Cint, Cint), 
+        bi, blist, ilist, atomtype, N, ncoeff, ncoeff, ntypes, quadraticflag)    
+
+    bd = zeros(ntypes*ncoeff*3*N)
+    ccall(Libdl.dlsym(snaplib, :cpuSnapTallyBispectrumDeriv), Cvoid, (Ptr{Cdouble}, Ptr{Cdouble},  
+        Ptr{Cdouble}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint, Cint, Cint, Cint), 
+        bd, blist, dblist, ai, ai, aj, ti, N, ijnum, ncoeff, ncoeff, ntypes, quadraticflag)    
+    
+    bv = zeros(6*ntypes*ncoeff)
+    ccall(Libdl.dlsym(snaplib, :cpuSnapTallyBispectrumVirial), Cvoid, (Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble},   
+        Ptr{Cdouble}, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint, Cint, Cint, Cint), 
+        bv, blist, dblist, rij, ai, ti, N, ijnum, ncoeff, ncoeff, ntypes, quadraticflag)  
+
+    bd = reshape(bd, (3*N,ntypes*ncoeff))
+    bv = reshape(bv, (6,ntypes*ncoeff))
+    bv = bv[[1; 2; 3; 6; 5; 4],:]
+
+    ai = ai .+ Int32(1)
+    aj = aj .+ Int32(1)
+
+    blist = reshape(blist, (N, idxb_max*ntriples)) 
+    dblist = reshape(dblist, (ijnum, dim, idxb_max*ntriples)) 
+
+    end
+
+    if ijnum==0
+    bi = zeros(ntypes*ncoeff)        
+    bd = zeros(3*N,ntypes*ncoeff)
+    bv = zeros(6,ntypes*ncoeff)    
+    blist = zeros(N, idxb_max*ntriples)
+    dblist = zeros(ijnum, dim, idxb_max*ntriples)    
+    end
+
+    #return bi, bd, bv, blist, dblist, ai, aj, pairnum             
+
+    eatom = bi
+    fatom = bd 
+    return eatom, fatom 
+end
+
+function snapefatom(x, t, a, b, c, pbc, descriptors)
+
+    globd = 0.0;
+    fatom = 0.0;
+    eatom1 = 0.0; 
+    fatom1 = 0.0; 
+    globd1 = 0.0; 
+    for n = 1:length(descriptors)
+        if (descriptors[n].name == "SNAP") & (descriptors[n].nbody==1) 
+            eatom1, fatom1 = snaponebodyefatom(x, t, a[:], b[:], c[:], pbc[:], descriptors[n])                    
+            globd1 = sum(eatom1, dims=1)            
+        elseif (descriptors[n].name == "SNAP") & (descriptors[n].nbody==4) 
+            sna = initsnap(descriptors[n])
+            globd1, fatom1 = snapfourbodyefatom(x, t, a[:], b[:], c[:], pbc[:], sna)                
+            globd1 = reshape(globd1, (1, length(globd1)))                        
+        end
+        if (n==1) 
+            globd = 1.0*globd1
+            fatom = 1.0*fatom1 
+        else                
+            globd = cat(globd, globd1, dims=2)                
+            fatom = cat(fatom, fatom1, dims=2)        
+        end
+    end            
+    
+    return globd, fatom    
+end
+    
+function snaplinearsystem(config, descriptors, normalizeenergy)
+    
+    # cumalative sum of numbers of atoms 
+    nconfigs = length(config.natom)
+    natom = [0; cumsum(config.natom[:])];
+    
+    matA = 0.0
+    vecb = 0.0
+    for i = 1:nconfigs
+        ci = i
+        normconst = 1.0
+        if normalizeenergy==1
+            normconst = 1.0/config.natom[ci]
+        end    
+        x, t, a, b, c, pbc, e, f = getconfig(config, natom, ci)
+        globd, fatom = snapefatom(x, t, a, b, c, pbc, descriptors)
+        
+        we2 = (config.we[1]*config.we[1])*(normconst*normconst)
+        wf2 = (config.wf[1]*config.wf[1])
+        matA = matA .+ (we2*(globd'*globd) + wf2*(fatom'*fatom))    
+        vecb = vecb .+ ((we2*e)*(globd') + wf2*(fatom'*f[:]))    
+    end
+    
+    return matA, vecb
+    
+end
+    
+function snapleastsq(data, descriptors, Doptions)
+    
+    display("Perform linear regression fitting ...")
+
+    for i = length(descriptors):-1:1    
+        if descriptors[i] === nothing
+            deleteat!(descriptors, i)            
+        end
+    end   
+    for i = length(data):-1:1    
+        if data[i] === nothing
+            deleteat!(data, i)            
+        end
+    end   
+
+    pbc = Doptions.pbc
+    normalizeenergy = Doptions.normalizeenergy
+    a = Doptions.a
+    b = Doptions.b
+    c = Doptions.c
+
+    n = length(data)
+    matA = 0.0
+    vecb = 0.0
+    for i = 1:n
+        if typeof(data[i]) == Preprocessing.DataStruct
+            config, ~ = Preprocessing.readconfigdata(data[i], pbc, a, b, c)                  
+        else
+            config = data[i]
+        end
+        A1, b1 = snaplinearsystem(config, descriptors, normalizeenergy)        
+        matA = matA .+ A1
+        vecb = vecb .+ b1         
+    end    
+
+    for i = 1:size(matA,1)
+        matA[i,i] = matA[i,i]*(1.0 + 1e-12);
+    end
+    
+    coeff = matA\vecb 
+    return coeff, matA, vecb 
+end
+    
+function snaperrors(config, descriptors, coeff, normalizeenergy)
+    
+    # cumalative sum of numbers of atoms 
+    nconfigs = length(config.natom)
+    natom = [0; cumsum(config.natom[:])];
+    
+    energy = zeros(nconfigs)
+    eerr = zeros(nconfigs)
+    fmae = zeros(nconfigs)
+    frmse = zeros(nconfigs)
+    szbf = zeros(nconfigs)
+    for i = 1:nconfigs
+        ci = i
+        normconst = 1.0
+        if normalizeenergy==1
+            normconst = 1.0/config.natom[ci]
+        end    
+        x, t, a, b, c, pbc, e, f = getconfig(config, natom, ci)
+        globd, fatom = snapefatom(x, t, a, b, c, pbc, descriptors)
+        e1 = globd*coeff;
+        f1 = fatom*coeff;
+
+        energy[i] = e1[1]*normconst        
+        eerr[i] = abs(e1[1] - e)*normconst         
+
+        N = length(f1)
+        szbf[i] = N 
+        res = (f1 - f[:])    
+        fmae[i] = sum(abs.(res))/N     
+        ssr = sum(res.^2)
+        mse = ssr /N;
+        frmse[i] = sqrt(mse) 
+    end
+    
+    emae = sum(abs.(eerr))/nconfigs
+    ssr = sum(eerr.^2)
+    mse = ssr/nconfigs
+    ermse = sqrt(mse) 
+
+    nforces = sum(szbf)
+    fmaeave = sum(fmae.*szbf)/nforces
+    frmseave =  sqrt(sum((frmse.^2).*szbf)/nforces)    
+
+    return eerr, emae, ermse, fmae, frmse, fmaeave, frmseave, nconfigs, nforces, energy 
+end
+        
+function snaperroranalysis(data, descriptors, Doptions, coeff)
+    
+    display("Calculate errors ...")
+
+    for i = length(descriptors):-1:1    
+        if descriptors[i] === nothing
+            deleteat!(descriptors, i)            
+        end
+    end   
+    for i = length(data):-1:1    
+        if data[i] === nothing
+            deleteat!(data, i)            
+        end
+    end   
+
+    pbc = Doptions.pbc
+    normalizeenergy = Doptions.normalizeenergy
+    a = Doptions.a
+    b = Doptions.b
+    c = Doptions.c
+
+    n = length(data)
+    emae = -ones(Float64,n)
+    fmae = -ones(Float64,n)
+    ermse = -ones(Float64,n)
+    frmse = -ones(Float64,n)
+    szbe = zeros(Int64, n)
+    szbf = zeros(Int64, n)
+    energies = Array{Any}(nothing, n)
+    eerr = Array{Any}(nothing, n)
+    ferr = Array{Any}(nothing, n)
+    ferm = Array{Any}(nothing, n)
+    for i = 1:n
+        if typeof(data[i]) == Preprocessing.DataStruct
+            config, ~ = Preprocessing.readconfigdata(data[i], pbc, a, b, c)                  
+        else
+            config = data[i]
+        end
+
+        e1, e2, e3, e4, e5, e6, e7, nconfigs, nforces, energy = 
+                snaperrors(config, descriptors, coeff, normalizeenergy)        
+
+        energies[i] = energy                 
+        eerr[i] = e1
+        ferr[i] = e4 
+        ferm[i] = e5 
+
+        szbe[i] = nconfigs
+        szbf[i] = nforces
+        emae[i] = e2
+        ermse[i] = e3 
+        fmae[i] = e6
+        frmse[i] = e7 
+    end    
+    
+    energyerrors = zeros((n+1),2)    
+    forceerrors = zeros((n+1),2)    
+    stresserrors = zeros((n+1),2)    
+
+    energyerrors[1,1] = sum(emae.*szbe)/sum(szbe)  # MAE
+    energyerrors[1,2] = sqrt(sum((ermse.^2).*szbe)/sum(szbe)) # RMSE 
+    energyerrors[2:end,:] = [emae ermse]        
+
+    forceerrors[1,1] = sum(fmae.*szbf)/sum(szbf)
+    forceerrors[1,2] =  sqrt(sum((frmse.^2).*szbf)/sum(szbf))    
+    forceerrors[2:end,:] = [fmae frmse]   
+
+    return energyerrors, forceerrors, stresserrors, eerr, ferr, ferm, energies  
+end
+    
+    

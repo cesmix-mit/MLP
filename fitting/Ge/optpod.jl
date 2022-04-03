@@ -4,7 +4,7 @@ include(MLPpath * "src/setup.jl");
 using DelimitedFiles
 
 # path to the database 
-datapath = "/Users/ngoccuongnguyen/Dropbox (MIT)/Research/Software/MLP/data/Ge/" #"../../data/Ge/"
+datapath = "../../data/Ge/"
 dataformat = "jsonpymatgen"
 fileextension = "json"
 atomspecies = ["Ge"];

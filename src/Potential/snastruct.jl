@@ -16,7 +16,8 @@
     rcutfacflag::Int32 = 0
     twojmaxflag::Int32  = 0
     elemradius::Vector{Float64} = [0.5]
-    elemweight::Vector{Float64} = [1.0]        
+    elemweight::Vector{Float64} = [1.0]   
+    nbody::Int32 = 4     
 end
 
 mutable struct SnaStruct

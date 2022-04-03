@@ -1,5 +1,9 @@
 function parsecomment(s)
 
+
+ii = findlast("pbc=\"T T T\"" , s)
+s = s[1:ii[1]-1] * s[(ii[end]+1):end] * " pbc=\"T T T\""
+
 p = split(s, '=', keepempty=false);
 n = length(p);
 
@@ -24,6 +28,10 @@ for i = 1:n-1
 end
 t = split(p[n], '"', keepempty=false);
 values[n-1] = t[1];
+
+# display(keys)
+# display(values)
+# error("here")
 
 # handle energy
 for i = 1:n-1    
@@ -72,8 +80,16 @@ while (m<n)
     natom = parse(Int64, f[m])    
     config.natom = hcat(config.natom, reshape([natom],1,1))
 
-    m = m + 1
-    keys, values, indp = parsecomment(f[m]);    
+    m = m + 1    
+    ii = findlast("pbc", f[m])
+    if ii === nothing
+        fm1 = f[m] * " " * f[m+1];        
+        keys, values, indp = parsecomment(fm1);            
+        m = m + 1;
+    else
+        keys, values, indp = parsecomment(f[m]);    
+    end
+
     for i = 1:length(keys)
         mystr = lowercase(string(keys[i]));
         if mystr == "lattice"

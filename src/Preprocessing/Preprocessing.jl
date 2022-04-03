@@ -52,6 +52,7 @@ include("readconfig.jl");
 include("readconfigfile.jl");
 include("readMDP.jl");
 include("readEXTXYZ.jl");
+include("writeEXTXYZ.jl");
 include("readJSON.jl");
 include("readJSONpymatgen.jl");
 include("readJSONfromFolder.jl");

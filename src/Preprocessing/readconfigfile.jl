@@ -5,7 +5,8 @@
 # Contributing authors: Ngoc-Cuong Nguyen (cuongng@mit.edu, exapde@gmail.com)
 #***************************************************************************
 
-function readconfigfile(datapath, datafile, dataformat, datamode, atomspecies, transposelattice=nothing)
+function readconfigfile(datapath, datafile, dataformat, datamode, atomspecies, 
+    transposelattice=nothing, pbc=nothing, original=0)
 
     #print("Read configuration from " * datapath * "\n");
     filename = datapath * "/" *  datafile;
@@ -25,6 +26,10 @@ function readconfigfile(datapath, datafile, dataformat, datamode, atomspecies, t
     
     config.nconfigs = length(config.natom); # number of configurations
     config.natomall = sum(config.natom);# number of atoms for all configurations    
+
+    if original==1
+        return config
+    end
 
     dim = config.dim;  
     if transposelattice == 1
@@ -51,13 +56,24 @@ function readconfigfile(datapath, datafile, dataformat, datamode, atomspecies, t
             B = config.b[:,i]
             C = config.c[:,i]
             a, b, c = rotatelattice(A, B, C)
-            # display([A[:] B[:] C[:]])
-            # display([a[:] b[:] c[:]])
+            #display([A[:] B[:] C[:]])
+            #display([a[:] b[:] c[:]])
             config.a[:,i] = a
             config.b[:,i] = b
             config.c[:,i] = c
             X = config.x[:,(natom[i]+1):natom[i+1]]
-            x, R = transformcoords(a,b,c,A,B,C,X)
+            x, R = transformcoords(a,b,c,A,B,C,X)        
+            if size(config.f,1) == size(R,2)
+                config.f[:,(natom[i]+1):natom[i+1]] = R*config.f[:,(natom[i]+1):natom[i+1]]
+            end
+
+            # Check if atoms are in the simulation box
+            if pbc !== nothing
+                B2C, C2B = cubemapping(a, b, c);
+                ximages = boxperiodicimages(pbc, a, b, c);        
+                x = checkconfig(x, ximages, B2C, C2B);    
+            end
+
             config.x[:,(natom[i]+1):natom[i+1]] = x
             # display(X)
             # display(x)            
@@ -68,7 +84,7 @@ function readconfigfile(datapath, datafile, dataformat, datamode, atomspecies, t
     return config    
 end
         
-function readconfigfile(app, transposelattice=nothing)
+function readconfigfile(app, transposelattice=nothing, pbc=nothing, original=0)
 
 #print("Read configuration from " * app.datapath);
 # filename = app.datapath * "/" *  app.datafile;
@@ -97,13 +113,14 @@ function readconfigfile(app, transposelattice=nothing)
 # end
 
 config = readconfigfile(app.datapath, app.datafile, app.dataformat, app.datamode, 
-            app.atomspecies, transposelattice)
+            app.atomspecies, transposelattice, pbc, original)
 
 return config
 
 end
 
-function readconfigpath(datapath, dataformat, fileextension, atomspecies, transposelattice=nothing)
+function readconfigpath(datapath, dataformat, fileextension, atomspecies, 
+    transposelattice=nothing, pbc=nothing, original=0)
 
     fileextension = lowercase(fileextension)
     datamode = (fileextension == "bin") ? 0 : 1
@@ -122,14 +139,14 @@ function readconfigpath(datapath, dataformat, fileextension, atomspecies, transp
     end
     
     datafile = files[j]
-    config = readconfigfile(datapath, datafile, dataformat, datamode, atomspecies, transposelattice)
+    config = readconfigfile(datapath, datafile, dataformat, datamode, atomspecies, transposelattice, pbc, original)    
 
     for i = (j+1):length(files)
         datafile = files[i]
         ii = findlast(".", datafile)
         ext = datafile[(ii[end]+1):end]    
         if (fileextension == lowercase(ext)) | (fileextension == "all")
-            config2 = readconfigfile(datapath, datafile, dataformat, datamode, atomspecies, transposelattice)
+            config2 = readconfigfile(datapath, datafile, dataformat, datamode, atomspecies, transposelattice, pbc, original)
             config = catconfig(config, config2)
         end
     end
@@ -141,7 +158,7 @@ function readconfigdata(data, pbc=nothing, a=nothing, b=nothing, c=nothing)
 
     datapath, dataformat, fileextension, percentage, randomize, atomspecies, 
             weight, translation, rotation, transposelattice  = getdata(data)
-    config = readconfigpath(datapath, dataformat, fileextension, atomspecies, transposelattice)
+    config = readconfigpath(datapath, dataformat, fileextension, atomspecies, transposelattice, pbc)
     config.nconfigs = length(config.natom)
 
     if randomize==1

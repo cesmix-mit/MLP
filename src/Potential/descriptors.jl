@@ -35,17 +35,23 @@ function machinelearningdescriptors(x, t, a, b, c, pbc, mldescriptors)
     
     # bispectrum, bispectrum derivatives, bispectrum virial
     if length(mldescriptors) > 0
-        mld = 0; mldd = 0; mldv = 0;
-        for i = 1:length(mldescriptors)       
-            md, mdd, mdv = mlglobaldescriptors(x, t, a, b, c, pbc, mldescriptors[i])   
-            if i == 1
-                mld = 1.0*md
-                mldd = 1.0*mdd
-                mldv = 1.0*mdv
-            else                
-                mld = [mld[:]; md[:]]
-                mldd = cat(mldd, mdd, dims=2);    
-                mldv = cat(mldv, mdv, dims=2);    
+        if (mldescriptors[1].name == "POD") & (mldescriptors[end].name == "POD")                  
+            mld, mldd, mldv = PODdescriptors(x, t, a, b, c, pbc, mldescriptors) 
+            sz = size(mldd)        
+            mldd = reshape(mldd, (sz[1]*sz[2], sz[3]))
+        else
+            mld = 0; mldd = 0; mldv = 0;
+            for i = 1:length(mldescriptors)       
+                md, mdd, mdv = mlglobaldescriptors(x, t, a, b, c, pbc, mldescriptors[i])   
+                if i == 1
+                    mld = 1.0*md
+                    mldd = 1.0*mdd
+                    mldv = 1.0*mdv
+                else                
+                    mld = [mld[:]; md[:]]
+                    mldd = cat(mldd, mdd, dims=2);    
+                    mldv = cat(mldv, mdv, dims=2);    
+                end
             end
         end
         return mld, mldd, mldv 
@@ -96,12 +102,20 @@ function globaldescriptors(x, q, t, a, b, c, pbc, eta, kappa, emdescriptors, mld
     end    
 end
 
+function eigenvalues(A)
+    s = eigvals(A)
+    U = eigvecs(A)
+    ind = sortperm(s, rev=true)
+    s = s[ind]
+    U = U[:,ind]
+    return U, s
+end
+
 function globaldescriptors(config, indices, eta, kappa, normalizeenergy, 
     normalizestress, descriptors, potential=nothing)
 
 # getdescriptors
 emdescriptors, mldescriptors = getemldescriptors(descriptors)
-
 
 # cumalative sum of numbers of atoms 
 nconfigs = length(config.natom)
@@ -114,7 +128,7 @@ bs  = []
 Ae = []
 Af = []
 As  = []
-for i = 1:length(indices)
+for i = 1:length(indices)    
     ci = indices[i]
     if ci > nconfigs
         error("Indices are greater than nconfigs")
@@ -143,7 +157,7 @@ for i = 1:length(indices)
     end
 
     d, dd, dv = globaldescriptors(x, q, t, a[:], b[:], c[:], pbc[:], eta, kappa, emdescriptors, mldescriptors)        
-    
+        
     if normalizestress==1
         vol = latticevolume(a[:], b[:], c[:])
         dv = (1.6021765e6/vol) * dv
@@ -591,3 +605,234 @@ function peratomdescriptors(data::Preprocessing.DataStruct, descriptors, options
 
     return Ae, Af, be, bf, A, P, ne, nf
 end
+
+
+function aceonebodyefatom(x, t, a, b, c, pbc, descriptors)
+
+    dim, N = size(x)
+    M = length(descriptors.species)    
+    eatom = zeros(N,M)
+    for m = 1:M
+        ind = findall(t[:] .== m);
+        eatom[ind,m] .= 1.0
+    end
+    fatom = zeros(dim*N,M)
+
+    return eatom, fatom 
+end
+
+function aceefatom(x, t, a, b, c, pbc, descriptors)
+
+    globd = 0.0;
+    fatom = 0.0;
+    eatom1 = 0.0; 
+    fatom1 = 0.0; 
+    globd1 = 0.0; 
+    for n = 1:length(descriptors)
+        if (descriptors[n].name == "ACE") & (descriptors[n].nbody==1) 
+            eatom1, fatom1 = aceonebodyefatom(x, t, a[:], b[:], c[:], pbc[:], descriptors[n])                    
+            globd1 = sum(eatom1, dims=1)            
+        elseif (descriptors[n].name == "ACE") 
+            globd1, fatom1 = ACEpot.ACEdescriptors(x, t, a, b, c, pbc, descriptors[n])                                       
+            globd1 = reshape(globd1, (1, length(globd1)))                        
+            dim,N,M = size(fatom1)
+            fatom1 = reshape(fatom1, (dim*N, M))
+        end
+        if (n==1) 
+            globd = 1.0*globd1
+            fatom = 1.0*fatom1 
+        else                
+            globd = cat(globd, globd1, dims=2)                
+            fatom = cat(fatom, fatom1, dims=2)        
+        end
+    end            
+    
+    return globd, fatom    
+end
+    
+function acelinearsystem(config, descriptors, normalizeenergy)
+    
+    # cumalative sum of numbers of atoms 
+    nconfigs = length(config.natom)
+    natom = [0; cumsum(config.natom[:])];
+    
+    matA = 0.0
+    vecb = 0.0
+    for i = 1:nconfigs
+        ci = i
+        normconst = 1.0
+        if normalizeenergy==1
+            normconst = 1.0/config.natom[ci]
+        end    
+        x, t, a, b, c, pbc, e, f = getconfig(config, natom, ci)
+        globd, fatom = aceefatom(x, t, a, b, c, pbc, descriptors)
+        
+        we2 = (config.we[1]*config.we[1])*(normconst*normconst)
+        wf2 = (config.wf[1]*config.wf[1])
+        matA = matA .+ (we2*(globd'*globd) + wf2*(fatom'*fatom))    
+        vecb = vecb .+ ((we2*e)*(globd') + wf2*(fatom'*f[:]))    
+    end
+    
+    return matA, vecb
+    
+end
+    
+function aceleastsq(data, descriptors, Doptions)
+    
+    display("Perform linear regression fitting ...")
+
+    for i = length(descriptors):-1:1    
+        if descriptors[i] === nothing
+            deleteat!(descriptors, i)            
+        end
+    end   
+    for i = length(data):-1:1    
+        if data[i] === nothing
+            deleteat!(data, i)            
+        end
+    end   
+
+    pbc = Doptions.pbc
+    normalizeenergy = Doptions.normalizeenergy
+    a = Doptions.a
+    b = Doptions.b
+    c = Doptions.c
+
+    n = length(data)
+    matA = 0.0
+    vecb = 0.0
+    for i = 1:n
+        if typeof(data[i]) == Preprocessing.DataStruct
+            config, ~ = Preprocessing.readconfigdata(data[i], pbc, a, b, c)                  
+        else
+            config = data[i]
+        end
+        A1, b1 = acelinearsystem(config, descriptors, normalizeenergy)        
+        matA = matA .+ A1
+        vecb = vecb .+ b1         
+    end    
+    
+    for i = 1:size(matA,1)
+        matA[i,i] = matA[i,i]*(1 + 1e-12)
+    end
+    coeff = matA\vecb 
+    return coeff, matA, vecb 
+end
+    
+function aceerrors(config, descriptors, coeff, normalizeenergy)
+    
+    # cumalative sum of numbers of atoms 
+    nconfigs = length(config.natom)
+    natom = [0; cumsum(config.natom[:])];
+    
+    energy = zeros(nconfigs)
+    eerr = zeros(nconfigs)
+    fmae = zeros(nconfigs)
+    frmse = zeros(nconfigs)
+    szbf = zeros(nconfigs)
+    for i = 1:nconfigs
+        ci = i
+        normconst = 1.0
+        if normalizeenergy==1
+            normconst = 1.0/config.natom[ci]
+        end    
+        x, t, a, b, c, pbc, e, f = getconfig(config, natom, ci)
+        globd, fatom = aceefatom(x, t, a, b, c, pbc, descriptors)
+        e1 = globd*coeff;
+        f1 = fatom*coeff;
+
+        energy[i] = e1[1]*normconst         
+        eerr[i] = abs(e1[1] - e)*normconst         
+
+        N = length(f1)
+        szbf[i] = N 
+        res = (f1 - f[:])    
+        fmae[i] = sum(abs.(res))/N     
+        ssr = sum(res.^2)
+        mse = ssr /N;
+        frmse[i] = sqrt(mse) 
+    end
+    
+    emae = sum(abs.(eerr))/nconfigs
+    ssr = sum(eerr.^2)
+    mse = ssr/nconfigs
+    ermse = sqrt(mse) 
+
+    nforces = sum(szbf)
+    fmaeave = sum(fmae.*szbf)/nforces
+    frmseave =  sqrt(sum((frmse.^2).*szbf)/nforces)    
+
+    return eerr, emae, ermse, fmae, frmse, fmaeave, frmseave, nconfigs, nforces, energy
+end
+        
+function aceerroranalysis(data, descriptors, Doptions, coeff)
+    
+    display("Calculate errors ...")
+
+    for i = length(descriptors):-1:1    
+        if descriptors[i] === nothing
+            deleteat!(descriptors, i)            
+        end
+    end   
+    for i = length(data):-1:1    
+        if data[i] === nothing
+            deleteat!(data, i)            
+        end
+    end   
+
+    pbc = Doptions.pbc
+    normalizeenergy = Doptions.normalizeenergy
+    a = Doptions.a
+    b = Doptions.b
+    c = Doptions.c
+
+    n = length(data)
+    emae = -ones(Float64,n)
+    fmae = -ones(Float64,n)
+    ermse = -ones(Float64,n)
+    frmse = -ones(Float64,n)
+    szbe = zeros(Int64, n)
+    szbf = zeros(Int64, n)
+    energies = Array{Any}(nothing, n)
+    eerr = Array{Any}(nothing, n)
+    ferr = Array{Any}(nothing, n)
+    ferm = Array{Any}(nothing, n)
+    for i = 1:n
+        if typeof(data[i]) == Preprocessing.DataStruct
+            config, ~ = Preprocessing.readconfigdata(data[i], pbc, a, b, c)                  
+        else
+            config = data[i]
+        end
+
+        e1, e2, e3, e4, e5, e6, e7, nconfigs, nforces, energy = 
+                aceerrors(config, descriptors, coeff, normalizeenergy)        
+
+        energies[i] = energy
+        eerr[i] = e1
+        ferr[i] = e4 
+        ferm[i] = e5 
+
+        szbe[i] = nconfigs
+        szbf[i] = nforces
+        emae[i] = e2
+        ermse[i] = e3 
+        fmae[i] = e6
+        frmse[i] = e7 
+    end    
+    
+    energyerrors = zeros((n+1),2)    
+    forceerrors = zeros((n+1),2)    
+    stresserrors = zeros((n+1),2)    
+
+    energyerrors[1,1] = sum(emae.*szbe)/sum(szbe)  # MAE
+    energyerrors[1,2] = sqrt(sum((ermse.^2).*szbe)/sum(szbe)) # RMSE 
+    energyerrors[2:end,:] = [emae ermse]        
+
+    forceerrors[1,1] = sum(fmae.*szbf)/sum(szbf)
+    forceerrors[1,2] =  sqrt(sum((frmse.^2).*szbf)/sum(szbf))    
+    forceerrors[2:end,:] = [fmae frmse]   
+
+    return energyerrors, forceerrors, stresserrors, eerr, ferr, ferm, energies   
+end
+   
+

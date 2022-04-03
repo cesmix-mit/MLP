@@ -20,9 +20,9 @@ aj = getindex.(ind, 1);
 # number of neighbors for each atom i
 numneigh = accumarray(ai, ones(length(ai),1)); 
 
-ai = Int64.(ai);
-aj = Int64.(aj);
-numneigh = Int64.(numneigh);
+ai = Int32.(ai);
+aj = Int32.(aj);
+numneigh = Int32.(numneigh);
 
 return ai, aj, numneigh
 

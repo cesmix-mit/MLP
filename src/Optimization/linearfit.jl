@@ -28,10 +28,11 @@ end
 
 function lsqsolve(Ae, Af, As, be, bf, bs)
 
-    cefs = zeros(0)
-    cef = zeros(0)
-    ce = zeros(0)
-    cf = zeros(0)
+    M = size(Ae,1)
+    cefs = zeros(M)
+    cef = zeros(M)
+    ce = zeros(M)
+    cf = zeros(M)
 
     sumAe = sum(abs.(Ae[:])) > 1e-15
     sumAf = sum(abs.(Af[:])) > 1e-15
@@ -39,6 +40,15 @@ function lsqsolve(Ae, Af, As, be, bf, bs)
     sumbe = sum(abs.(be[:])) > 1e-15
     sumbf = sum(abs.(bf[:])) > 1e-15
     sumbs = sum(abs.(bs[:])) > 1e-15
+
+    for m = 1:size(Ae,1)
+        if abs(Ae[m,m]) < 1e-15
+            sumAe = false 
+            sumAf = false 
+            sumAs = false 
+            break;
+        end 
+    end
 
     if (sumAe) & (sumAf) & (sumAs) & (sumbe) & (sumbf) & (sumbs) 
         A = Ae+Af+As
@@ -61,16 +71,16 @@ function lsqsolve(Ae, Af, As, be, bf, bs)
         end
         ce = A\be
     end
-    if (sumAf) & (sumbf) 
-        A = 1.0*Af
-        for i = 1:size(A,1)
-            A[i,i] = A[i,i]*(1 + 1e-15)
-        end        
-        if abs(A[1,1])<=1e-10
-            A[1,1] = 1e-10
-        end
-        cf = A\bf
-    end
+    # if (sumAf) & (sumbf) 
+    #     A = 1.0*Af
+    #     for i = 1:size(A,1)
+    #         A[i,i] = A[i,i]*(1 + 1e-15)
+    #     end        
+    #     if abs(A[1,1])<=1e-10
+    #         A[1,1] = 1e-10
+    #     end
+    #     cf = A\bf
+    # end
 
     return ce, cf, cef, cefs
 end
@@ -112,8 +122,34 @@ function calerrors(Aei, bei, cei)
         rmse = sqrt(mse) 
         avg = sum(bei)/length(bei);
         rsq = 1.0 - ssr/sum((bei .- avg).^2);
+        res = abs.(res)
     end
-    return mae, rmse, rsq, ssr, avg
+    return mae, rmse, rsq, ssr, avg, res
+end
+
+function calerrors(config, Afi, bfi, cfi)
+    mae = -1.0
+    rmse = - 1.0
+    rsq = -1.0
+    ssr = -1.0
+    avg = -1.0
+    if (length(bfi) > 0) & (length(cfi)>0) & (length(Afi)>0)       
+        res = bfi - Afi*cfi
+        n = size(config.lattice,2)
+        dim = size(config.x,1)
+        natom = [0; cumsum(config.natom[:])];
+        err = zeros(n)
+        for i = 1:n
+            err[i] = sum(abs.(res[(dim*natom[i]+1):dim*natom[i+1]]))/(dim*config.natom[i])
+        end
+        mae = sum(abs.(res))/length(bfi)       
+        ssr = sum(res.^2)
+        mse = ssr /length(bfi);
+        rmse = sqrt(mse) 
+        avg = sum(bfi)/length(bfi);
+        rsq = 1.0 - ssr/sum((bfi .- avg).^2);
+    end    
+    return err, mae, rmse, rsq, ssr, avg
 end
 
 function applyweight(Aei, bei, we)
@@ -130,6 +166,30 @@ function applytranspose(Aei, bei, m, n)
         Cei = Aei'*bei        
     end
     return Cei
+end
+
+using LinearAlgebra
+function eigendecomp(B)
+    N = size(B,1)
+    A = (1.0/N)*(B'*B);
+    s = eigvals(A)
+    U = eigvecs(A)
+    ind = sortperm(s, rev=true)
+    s = s[ind]
+    U = U[:,ind]
+
+    nbf = length(s)
+    sumeig = sum(s);
+    k = 0
+    for i = 1:nbf
+        a = sum(s[1:i])/sumeig;
+        if a >= (1.0 - 1e-4)
+            k = i
+            break;
+        end
+    end
+
+    return s, U, k
 end
 
 function linearfit(data, descriptors, potential, Doptions, optim::OptimStruct)
@@ -174,6 +234,8 @@ function linearfit(data, descriptors, potential, Doptions, optim::OptimStruct)
     hf = 1.0
     hs = 1.0
     for i = 1:n
+        display("Data : " * string(i))
+        #display(data[i].datapath)
         # training data set
         if typeof(data[i]) == Preprocessing.DataStruct
             config, indices = Preprocessing.readconfigdata(data[i], pbc, a, b, c)                  
@@ -187,8 +249,24 @@ function linearfit(data, descriptors, potential, Doptions, optim::OptimStruct)
         # display(config.ws)
         # error("here")
     
+        # display(data[i])
+        # display(config.natom)
+        # display(config.t)
+
+        #@time begin   
         Aei, Afi, Asi, bei, bfi, bsi, nfi = Potential.globaldescriptors(config, training, eta, kappa, 
                 normalizeenergy, normalizestress, descriptors, potential)
+        #end
+                    
+        # sz = size(Afi)        
+        # Aft = reshape(Afi, (3, Int32(sz[1]/3), sz[2]))
+        # se, Ue, ke = eigendecomp(Aei)
+        # sf1, Uf1, kf1 = eigendecomp(Aft[1,:,:])
+        # sf2, Uf2, kf2 = eigendecomp(Aft[2,:,:])
+        # sf3, Uf3, kf3 = eigendecomp(Aft[3,:,:])        
+        # show(stdout, "text/plain", [se sf1 sf2 sf3])
+        # show(stdout, "text/plain", [Ue[:,1] Uf1[:,1] Uf2[:,1] Uf3[:,1]])
+        # display([ke kf1 kf2 kf3 length(se) size(Aei) size(Ue)])
 
         m = size(Aei,2) # total number of descriptors
         if i == 1            
@@ -228,6 +306,15 @@ function linearfit(data, descriptors, potential, Doptions, optim::OptimStruct)
         hf += applytranspose(Afi, bfi, m, 1)    
         hs += applytranspose(Asi, bsi, m, 1)            
         
+        # display(Le+Lf)
+        # display(he+hf)
+        # display([config.we config.wf])
+        # if i==n
+        #     savebin("A.bin",Le+Lf)
+        #     savebin("b.bin",he+hf)
+        #     #error("here")
+        # end
+
         if length(data)==1
             if optim.method == "lsq"
                 cei, cfi, cefi, cefsi = lsqsolve(Le, Lf, Ls, he, hf, hs)
@@ -317,6 +404,173 @@ function linearfit(data, descriptors, potential, Doptions, optim::OptimStruct)
     return coeff, ce, cf, cef, cefs, emae, fmae, smae, De, Df, Ds, de, df, ds
 end
 
+function linearfit(traindata, descriptors, Doptions)
+        
+    traindata = Preprocessing.deletenothing(traindata)
+    descriptors = Preprocessing.deletenothing(descriptors)
+
+    pbc = Doptions.pbc
+    a = Doptions.a
+    b = Doptions.b
+    c = Doptions.c
+
+    # read data 
+    trainconfig = Array{Any}(undef, length(traindata))
+    for i = 1:length(traindata)
+        trainconfig[i], indices = Preprocessing.readconfigdata(traindata[i], pbc, a, b, c)    
+        ntrain = trainconfig[i].nconfigs
+        println("Number of training configurations for " * traindata[i].datapath * " : $ntrain")                      
+    end
+
+    pod = 0;
+    ace = 0;
+    snap = 0;
+    for i = 1:length(descriptors)
+        if descriptors[i].name == "POD"
+            pod = 1
+            break;
+        end
+        if descriptors[i].name == "ACE"
+            ace = 1
+            break;
+        end
+        if descriptors[i].name == "SNAP"
+            snap = 1
+            break;
+        end
+    end
+
+    if pod==1
+        @time begin
+        descriptors = Potential.podprojection(trainconfig, descriptors, Doptions.pbc, Doptions.a, Doptions.b, Doptions.c)
+        end
+        @time begin
+        coeff,~ = Potential.podleastsq(trainconfig, descriptors, Doptions)
+        end
+    elseif ace==1
+        @time begin
+        coeff,~ = Potential.aceleastsq(trainconfig, descriptors, Doptions)
+        end
+    elseif snap==1
+        @time begin
+        coeff,~ = Potential.snapleastsq(trainconfig, descriptors, Doptions)
+        end
+    else        
+        error("Descriptors is not supported")
+    end
+    return coeff 
+end
+
+function erroranalysis(data, descriptors, potential, Doptions, optim::OptimStruct, coeff)    
+    
+    data = Preprocessing.deletenothing(data)
+    descriptors = Preprocessing.deletenothing(descriptors)
+    potential = Preprocessing.deletenothing(potential)
+
+    lossfunc, method, eta, kappa, weightouter, etaspace, kappalist = getoptim(optim)
+    
+    pbc = Doptions.pbc
+    normalizeenergy = Doptions.normalizeenergy
+    normalizestress = Doptions.normalizestress
+    a = Doptions.a
+    b = Doptions.b
+    c = Doptions.c
+    
+    n = length(data)
+    emae = -ones(Float64,n)
+    fmae = -ones(Float64,n)
+    smae = -ones(Float64,n)
+    ermse = -ones(Float64,n)
+    frmse = -ones(Float64,n)
+    srmse = -ones(Float64,n)
+    ersq = -ones(Float64,n)
+    frsq = -ones(Float64,n)
+    srsq = -ones(Float64,n)
+    essr = -ones(Float64,n)
+    fssr = -ones(Float64,n)
+    sssr = -ones(Float64,n)
+    eavg = -ones(Float64,n)
+    favg = -ones(Float64,n)
+    savg = -ones(Float64,n)
+    szbe = zeros(Int64, n)
+    szbf = zeros(Int64, n)
+    szbs = zeros(Int64, n)
+    be = []
+    bf = []
+    bs = []
+    eerr = Array{Any}(nothing, n)
+    ferr = Array{Any}(nothing, n)
+    for i = 1:n
+        display("Data : " * string(i))
+        if typeof(data[i]) == Preprocessing.DataStruct
+            config, indices = Preprocessing.readconfigdata(data[i], pbc, a, b, c)                  
+        else
+            config = data[i]
+        end
+        valid = Array(1:config.nconfigs)      
+
+        Aei, Afi, Asi, bei, bfi, bsi, nfi = Potential.globaldescriptors(config, valid, eta, kappa, 
+                        normalizeenergy, normalizestress, descriptors, potential)
+
+        szbe[i] = length(bei)        
+        szbf[i] = length(bfi)        
+        szbs[i] = length(bsi)        
+
+        emae[i], ermse[i], ersq[i], essr[i], eavg[i] = calerrors(Aei, bei, coeff)
+        fmae[i], frmse[i], frsq[i], fssr[i], favg[i] = calerrors(Afi, bfi, coeff)
+        smae[i], srmse[i], srsq[i], sssr[i], savg[i] = calerrors(Asi, bsi, coeff)
+
+        eerr[i] = abs.(bei-Aei*coeff)
+        ferr[i],~ = calerrors(config, Afi, bfi, coeff)
+
+        if szbe[i] > 0
+            be = [be; bei]
+        end 
+        if szbf[i] > 0
+            bf = [bf; bfi]
+        end 
+        if szbs[i] > 0
+            bs = [bs; bsi]
+        end 
+    end
+
+    energyerrors = -ones((n+1),3)    
+    forceerrors = -ones((n+1),3)    
+    stresserrors = -ones((n+1),3)    
+
+    if sum(szbe) > 0 
+        ssr = sum(essr)
+        avg = sum(eavg.*szbe)/sum(szbe)          
+        rsq = 1.0 - ssr/sum((be .- avg).^2);
+        energyerrors[1,1] = sum(emae.*szbe)/sum(szbe)  # MAE
+        energyerrors[1,2] = sqrt(sum((ermse.^2).*szbe)/sum(szbe)) # RMSE 
+        energyerrors[1,3] = rsq
+        energyerrors[2:end,:] = [emae ermse ersq]        
+    end
+
+    if sum(szbf) > 0 
+        ssr = sum(fssr)
+        avg = sum(favg.*szbf)/sum(szbf)          
+        rsq = 1.0 - ssr/sum((bf .- avg).^2);
+        forceerrors[1,1] = sum(fmae.*szbf)/sum(szbf)
+        forceerrors[1,2] =  sqrt(sum((frmse.^2).*szbf)/sum(szbf))    
+        forceerrors[1,3] = rsq 
+        forceerrors[2:end,:] = [fmae frmse frsq]   
+    end    
+    
+    if sum(szbs) > 0 
+        ssr = sum(sssr)
+        avg = sum(savg.*szbs)/sum(szbs)          
+        rsq = 1.0 - ssr/sum((bs .- avg).^2);
+        stresserrors[1,1] = sum(smae.*szbs)/sum(szbs)
+        stresserrors[1,2] = sqrt(sum((srmse.^2).*szbs)/sum(szbs))        
+        stresserrors[1,3] = rsq 
+        stresserrors[2:end,:] = [smae srmse srsq]   
+    end
+
+    return energyerrors, forceerrors, stresserrors, eerr, ferr 
+end
+
 function validate(data, descriptors, potential, Doptions, optim::OptimStruct, coeff)    
     
     data = Preprocessing.deletenothing(data)
@@ -355,6 +609,7 @@ function validate(data, descriptors, potential, Doptions, optim::OptimStruct, co
     bf = []
     bs = []
     for i = 1:n
+        display("Data : " * string(i))
         if typeof(data[i]) == Preprocessing.DataStruct
             config, indices = Preprocessing.readconfigdata(data[i], pbc, a, b, c)                  
         else
@@ -372,11 +627,6 @@ function validate(data, descriptors, potential, Doptions, optim::OptimStruct, co
         emae[i], ermse[i], ersq[i], essr[i], eavg[i] = calerrors(Aei, bei, coeff)
         fmae[i], frmse[i], frsq[i], fssr[i], favg[i] = calerrors(Afi, bfi, coeff)
         smae[i], srmse[i], srsq[i], sssr[i], savg[i] = calerrors(Asi, bsi, coeff)
-
-        # display(sum(abs.(bei))/length(bei))
-        # display(emae[i])
-        # display(sum(abs.(bfi))/length(bfi))
-        # display(fmae[i])
 
         if szbe[i] > 0
             be = [be; bei]
@@ -471,10 +721,32 @@ function maespace(traindata, validdata, descriptors, potential, Doptions, optim:
     trainconfig = Array{Any}(undef, length(traindata))
     for i = 1:length(traindata)
         trainconfig[i], indices = Preprocessing.readconfigdata(traindata[i], pbc, a, b, c)                  
+        ntrain = trainconfig[i].nconfigs
+        println("Number of training configurations for " * traindata[i].datapath * " : $ntrain")
     end
     validconfig = Array{Any}(undef, length(validdata))
     for i = 1:length(validdata)
         validconfig[i], indices = Preprocessing.readconfigdata(validdata[i], pbc, a, b, c)                  
+        nvalid = validconfig[i].nconfigs
+        println("Number of validation configurations for " * validdata[i].datapath * " : $nvalid")
+    end    
+
+    pod = 0;
+    ace = 0;
+    snap = 0;
+    for i = 1:length(descriptors)
+        if descriptors[i].name == "POD"
+            pod = 1
+            break;
+        end
+        if descriptors[i].name == "ACE"
+            ace = 1
+            break;
+        end
+        if descriptors[i].name == "SNAP"
+            snap = 1
+            break;
+        end
     end
 
     neta = size(eta,1)
@@ -485,19 +757,45 @@ function maespace(traindata, validdata, descriptors, potential, Doptions, optim:
     for n = 1:neta
         optim.eta[1:meta] = eta[n,:]
         descriptors = setcutoff(descriptors, optim.eta)      
-        @time begin
-        coeff,~ = linearfit(trainconfig, descriptors, potential, Doptions, optim)
-        if n==1
-            display(size(coeff))
-        end
-        eerr, ferr, serr = validate(validconfig, descriptors, potential, Doptions, optim, coeff)    
+        if pod==1
+            @time begin
+            descriptors = Potential.podprojection(trainconfig, descriptors, Doptions.pbc, Doptions.a, Doptions.b, Doptions.c)
+            end
+            @time begin
+            coeff,~ = Potential.podleastsq(trainconfig, descriptors, Doptions)
+            end
+            @time begin
+            eerr, ferr = Potential.poderroranalysis(validconfig, descriptors, Doptions, coeff)
+            end
+        elseif ace==1
+            @time begin
+            coeff,~ = Potential.aceleastsq(trainconfig, descriptors, Doptions)
+            end
+            @time begin
+            eerr, ferr = Potential.aceerroranalysis(validconfig, descriptors, Doptions, coeff)
+            end
+        elseif snap==1
+            @time begin
+            coeff,~ = Potential.snapleastsq(trainconfig, descriptors, Doptions)
+            end
+            @time begin
+            eerr, ferr = Potential.snaperroranalysis(validconfig, descriptors, Doptions, coeff)
+            end            
+        else        
+            coeff,~ = linearfit(trainconfig, descriptors, potential, Doptions, optim)
+            #display(maximum(abs.(coeff1[:]-coeff[:])))
+            eerr, ferr, serr = validate(validconfig, descriptors, potential, Doptions, optim, coeff)     
         end
         emae[n] = eerr[1]
         fmae[n] = ferr[1]
-        smae[n] = serr[1]                
-        a1 = num2string(emae[n], 16); 
-        a2 = num2string(fmae[n], 16); 
-        a3 = num2string(smae[n], 16);
+        smae[n] = 0.0        
+        
+        if n==1
+            display(size(coeff))
+        end
+        a1 = string(emae[n])
+        a2 = string(fmae[n])
+        a3 = string(smae[n])
         mystr = "$n  "
         for j = 1:length(eta[n,:])
             a = num2string(eta[n,j], 16)
@@ -506,7 +804,7 @@ function maespace(traindata, validdata, descriptors, potential, Doptions, optim:
         print(mystr * a1 * "  " * a2 * "  " * a3 * " \n")
     end
 
-    return eta, emae, fmae, smae
+    return eta, emae, fmae, smae, trainconfig
 end
 
 function gradientdescent(c, yspace, y0=nothing)
@@ -593,7 +891,7 @@ function optimize(traindata, testdata, descriptors, potential, Doptions, optim::
     potential = Preprocessing.deletenothing(potential)
 
     # compute errors on the eta space grid
-    etapts, emae, fmae, smae = maespace(traindata, testdata, descriptors, potential, Doptions, optim)    
+    etapts, emae, fmae, smae, trainconfig = maespace(traindata, testdata, descriptors, potential, Doptions, optim)    
 
     lossfunc = optim.lossfunc
     weightouter = optim.weightouter
@@ -629,10 +927,42 @@ function optimize(traindata, testdata, descriptors, potential, Doptions, optim::
     # set cut-off radius
     descriptors = setcutoff(descriptors, optim.eta)        
     
-    # compute coefficient 
-    coeff,~ = linearfit(traindata, descriptors, potential, Doptions, optim)
+    pod = 0;
+    ace = 0;
+    snap = 0;
+    for i = 1:length(descriptors)
+        if descriptors[i].name == "POD"
+            pod = 1
+            break;
+        end
+        if descriptors[i].name == "ACE"
+            ace = 1
+            break;
+        end
+        if descriptors[i].name == "SNAP"
+            snap = 1
+            break;
+        end
+    end
 
-    return eta, coeff, fmin, iter, pc, f, etapts, emae, fmae, smae
+    # compute coefficient 
+    #coeff,~ = linearfit(traindata, descriptors, potential, Doptions, optim)    
+    if pod==1
+        descriptors = Potential.podprojection(trainconfig, descriptors, Doptions.pbc, Doptions.a, Doptions.b, Doptions.c)
+        coeff,~ = Potential.podleastsq(trainconfig, descriptors, Doptions)
+        eerr, ferr, serr = Potential.poderroranalysis(trainconfig, descriptors, Doptions, coeff)
+    elseif ace==1
+        coeff,~ = Potential.aceleastsq(trainconfig, descriptors, Doptions)
+        eerr, ferr, serr = Potential.aceerroranalysis(trainconfig, descriptors, Doptions, coeff)      
+    elseif snap==1
+        coeff,~ = Potential.snapleastsq(trainconfig, descriptors, Doptions)
+        eerr, ferr, serr = Potential.snaperroranalysis(trainconfig, descriptors, Doptions, coeff)        
+    else        
+        coeff,~ = linearfit(trainconfig, descriptors, potential, Doptions, optim)
+        eerr, ferr, serr = validate(trainconfig, descriptors, potential, Doptions, optim, coeff)     
+    end
+
+    return eta, coeff, fmin, iter, pc, f, etapts, eerr, ferr, serr, emae, fmae, smae
 end
 
 

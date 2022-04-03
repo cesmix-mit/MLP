@@ -19,7 +19,7 @@ for ii = 1:inum
     pairlist = [pairlist; g[ind]];      
 end
 
-pairnum = [0; cumsum(pairnum)];
+pairnum = eltype(ilist).([0; cumsum(pairnum)]);
 pairlist = eltype(ilist).(pairlist)
 
 return pairlist, pairnum
@@ -56,7 +56,7 @@ for ii = 1:inum
     pairlist = [pairlist; g[ind]];      
 end
 
-pairnum = [0; cumsum(pairnum)];
+pairnum = eltype(ilist).([0; cumsum(pairnum)]);
 pairlist = eltype(ilist).(pairlist)
 
 return pairlist, pairnum
@@ -89,8 +89,8 @@ for ii = 1:inum
     pairnum[ii] = length(ind);       
     pairlist = [pairlist; g[ind]];      
 end
-pairnum = [0; cumsum(pairnum)];
 
+pairnum = eltype(ilist).([0; cumsum(pairnum)]);
 pairlist = eltype(ilist).(pairlist)
 
 return pairlist, pairnum

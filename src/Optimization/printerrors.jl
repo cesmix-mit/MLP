@@ -47,3 +47,71 @@ function printerrors(folders, errors, errstr)
     print(repeat('-', 88) * "\n")
 
 end
+
+using Printf 
+
+function printlatextable(a::Matrix{Float64})
+
+    m, n = size(a)
+    s = Array{Any}(nothing, m);
+    for i = 1:m
+        s[i] = " "
+        for j = 1:n
+            if j < n                                
+                s[i] = s[i] * @sprintf("%.2E", a[i,j]) * " & "                
+            else
+                s[i] = s[i] * @sprintf("%.2E", a[i,j]) * " \\ "   
+            end
+        end
+    end
+end
+
+function printlatextable(f, a::Matrix{Float64})
+
+    m, n = size(a)
+    s = Array{Any}(nothing, m);
+    for i = 1:m
+        s[i] = f[i] * " & "
+        for j = 1:n
+            if j < n                                
+                s[i] = s[i] * @sprintf("%.2E", a[i,j]) * " & "                
+            else
+                s[i] = s[i] * @sprintf("%.2E", a[i,j]) * " \\ "   
+            end
+        end
+    end
+end
+
+function printlatextable(f, a::Matrix{Float64}, d)
+
+    m, n = size(a)
+    s = Array{Any}(nothing, m);
+    for i = 1:m
+        s[i] = f[i] * " & "
+        for j = 1:n
+            if j < n                                
+                s[i] = s[i] * num2string(a[i,j], d) * " & "                
+            else
+                s[i] = s[i] * num2string(a[i,j], d) * " \\ "   
+            end
+        end
+    end
+end
+
+
+function printlatextable(a::Matrix{Float64}, d)
+
+    m, n = size(a)
+    s = Array{Any}(nothing, m);
+    for i = 1:m
+        s[i] = " "
+        for j = 1:n
+            if j < n                                
+                s[i] = s[i] * num2string(a[i,j], d) * " & "                
+            else
+                s[i] = s[i] * num2string(a[i,j], d) * " \\ "   
+            end
+        end
+    end
+    return s
+end

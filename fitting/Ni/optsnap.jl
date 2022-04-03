@@ -76,7 +76,7 @@ optim = setoptim(lossfunc, method, eta, kappa, weightouter, etaspace)
 descriptors[1] = POD(nbody=1, pdegree=[0], nbasis = [1], rin = rin, rcut=rcut)
 
 twojmaxlist = [2, 4, 6, 8, 10, 12]
-for j = 3:3
+for j = 0:3
     twojmx = twojmaxlist[j+1]
 
     # SNAP descriptors
@@ -98,11 +98,11 @@ for j = 3:3
     printerrors(["test"], forcetesterrors, "Force Errors")
 
     Preprocessing.mkfolder("results")
-    writedlm("results/optsnapcoeff" * string(j) *  ".txt", coeff)
-    writedlm("results/optsnappolycoeff" * string(j) *  ".txt", polycoeff)
-    writedlm("results/optsnaptrainerror" * string(j) *  ".txt", [energyerrors forceerrors])    
-    writedlm("results/optsnaptesterror" * string(j) *  ".txt", [energytesterrors forcetesterrors])    
-    writedlm("results/optsnapeta" * string(j) *  ".txt", opteta)
+    writedlm("results/optsnapcoeff" * string(6+j) *  ".txt", coeff)
+    writedlm("results/optsnappolycoeff" * string(6+j) *  ".txt", polycoeff)
+    writedlm("results/optsnaptrainerror" * string(6+j) *  ".txt", [energyerrors forceerrors])    
+    writedlm("results/optsnaptesterror" * string(6+j) *  ".txt", [energytesterrors forcetesterrors])    
+    writedlm("results/optsnapeta" * string(6+j) *  ".txt", opteta)
 end
 
 

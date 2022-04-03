@@ -129,11 +129,11 @@ for j = 3:3
     # printerrors(["test"], forcetesterrors, "Force Errors")
 
     Preprocessing.mkfolder("results")
-    writedlm("results/optacecoeff" * string(j) *  ".txt", coeff)
-    writedlm("results/optacepolycoeff" * string(j) *  ".txt", polycoeff)
-    writedlm("results/optacetrainerror" * string(j) *  ".txt", [energyerrors forceerrors])    
+    writedlm("results/optacecoeff" * string(6+j) *  ".txt", coeff)
+    writedlm("results/optacepolycoeff" * string(6+j) *  ".txt", polycoeff)
+    writedlm("results/optacetrainerror" * string(6+j) *  ".txt", [energyerrors forceerrors])    
     #writedlm("results/optacetesterror" * string(j) *  ".txt", [energytesterrors forcetesterrors])    
-    writedlm("results/optaceeta" * string(j) *  ".txt", opteta)
+    writedlm("results/optaceeta" * string(6+j) *  ".txt", opteta)
 end
 
 

@@ -5,12 +5,12 @@ function  neightriplets(x, q, tripletlist, tripletnum, atomtype, ilist, alist)
     inum = length(ilist);
     ijknum = sum(tripletnum[ilist.+1]-tripletnum[ilist]);
     
-    ai = zeros(Int64,ijknum);
-    aj = zeros(Int64,ijknum);
-    ak = zeros(Int64,ijknum);
-    ti = zeros(Int64,ijknum);
-    tj = zeros(Int64,ijknum);
-    tk = zeros(Int64,ijknum);
+    ai = zeros(Int32,ijknum);
+    aj = zeros(Int32,ijknum);
+    ak = zeros(Int32,ijknum);
+    ti = zeros(Int32,ijknum);
+    tj = zeros(Int32,ijknum);
+    tk = zeros(Int32,ijknum);
     xij = zeros(dim,ijknum);
     xik = zeros(dim,ijknum);
     qi = zeros(ncq,ijknum);

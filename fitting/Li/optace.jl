@@ -75,7 +75,7 @@ eta = [rcut, 1.0];
 kappa = [0];  
 optim = setoptim(lossfunc, method, eta, kappa, weightouter, etaspace)
 
-for j = 3:3
+for j = 2:2
 
     local acedescriptors = Array{Any}(nothing, 3)
 

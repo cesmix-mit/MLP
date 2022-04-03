@@ -1,8 +1,8 @@
 function makejk(n)
     
-    m = Int64((n-1)*n/2);
-    indj = zeros(Int64,m);
-    indk = zeros(Int64,m);
+    m = Int32((n-1)*n/2);
+    indj = zeros(Int32,m);
+    indk = zeros(Int32,m);
     k1 = 1;
     for i = 1:(n-1)
         ind = k1:(k1+(n-i)-1);
@@ -40,10 +40,10 @@ function makejk(e2ij, f2ij, pairnum, tripletnum, ilist)
     wik = zeros(3,ijknum,M);      
     n = maximum(pairnum[ilist.+1]-pairnum[ilist]);  
     m = Int32((n-1)*n/2);      
-    indj = zeros(Int64, m)
-    indk = zeros(Int64, m)
-    ind = zeros(Int64, m)
-    ind2 = zeros(Int64, n)    
+    indj = zeros(Int32, m)
+    indk = zeros(Int32, m)
+    ind = zeros(Int32, m)
+    ind2 = zeros(Int32, n)    
     ei = zeros(n, M)
     f1 = zeros(n, M)
     f2 = zeros(n, M)
@@ -70,9 +70,9 @@ function makejk(e2ij, f2ij, pairnum, tripletnum, ilist)
         for i1 = 1:M
             for i2 = 1:n2
                 ei[i2,i1] = e2ij[ind2[i2],i1]
-                f1[i2,i1] = f2ij[1,ind2[i2],i1]
-                f2[i2,i1] = f2ij[2,ind2[i2],i1]
-                f3[i2,i1] = f2ij[3,ind2[i2],i1]
+                f1[i2,i1] = f2ij[1+3*(ind2[i2]-1),i1]
+                f2[i2,i1] = f2ij[2+3*(ind2[i2]-1),i1]
+                f3[i2,i1] = f2ij[3+3*(ind2[i2]-1),i1]
             end
         end
         for i1 = 1:M
@@ -124,8 +124,8 @@ end
         
 function neightripletlist(pairlist, pairnumsum, ilist)
 
-    pairnum = Int64.(pairnumsum[2:end]-pairnumsum[1:end-1]);
-    tripletnum  = Int64.((pairnum.-1).*pairnum/2);
+    pairnum = Int32.(pairnumsum[2:end]-pairnumsum[1:end-1]);
+    tripletnum  = Int32.((pairnum.-1).*pairnum/2);
 
     inum = length(ilist)
     nt = 0
@@ -133,9 +133,9 @@ function neightripletlist(pairlist, pairnumsum, ilist)
         n = pairnum[i]
         nt = nt + (n-1)*n/2
     end
-    nt = Int64(nt)
-    tripletlistj = zeros(Int64,nt);
-    tripletlistk = zeros(Int64,nt);
+    nt = Int32(nt)
+    tripletlistj = zeros(Int32,nt);
+    tripletlistk = zeros(Int32,nt);
 
     nt = 0
     for ii = 1:inum
@@ -147,7 +147,7 @@ function neightripletlist(pairlist, pairnumsum, ilist)
         indj, indk = makejk(n);        
         # tripletlistj = [tripletlistj; g[indj]];      
         # tripletlistk = [tripletlistk; g[indk]];     
-        k = Int64((n-1)*n/2)  
+        k = Int32((n-1)*n/2)  
         tripletlistj[(nt+1):(nt+k)] =  g[indj];      
         tripletlistk[(nt+1):(nt+k)] =  g[indk];      
         nt = nt + k
@@ -156,8 +156,8 @@ function neightripletlist(pairlist, pairnumsum, ilist)
     tripletlist = [tripletlistj[:] tripletlistk[:]];
     tripletnum = [0; cumsum(tripletnum)];
 
-    tripletlist = Int64.(tripletlist)
-    tripletnum  = Int64.(tripletnum)
+    tripletlist = Int32.(tripletlist)
+    tripletnum  = Int32.(tripletnum)
 
     return tripletlist, tripletnum
 

@@ -1,8 +1,6 @@
-cdir = pwd(); ii = findlast("MDP", cdir); MDPpath = cdir[1:ii[end]] * "/";    
-include(MDPpath * "installation/setup.jl");
+cdir = pwd(); ii = findlast("MLP", cdir); MLPpath = cdir[1:ii[end]] * "/";    
+include(MLPpath * "src/setup.jl");
 
-push!(LOAD_PATH, MDPpath * "src/Julia/ACEpot");
-using ACEpot
 using DelimitedFiles
 
 # path to the database 
@@ -45,60 +43,63 @@ testdata[1] = adddata(datapath * "test", dataformat, fileextension,
 # Descriptors optional parameters
 Doptions = DescriptorsOptions(pbc = [1, 1, 1], normalizeenergy=true, normalizestress=true)
 
-# loss function style must be: "energy", "force", "energyforce", "energyforcestress"
-lossfunc = "energyforce"
+for j = 0:5    
+    
+    display(j)
+    local acedescriptors = Array{Any}(nothing, 3)
+    acedescriptors[1] = ACEpot.ACEparams(species = [:Si], nbody=1, pdegree=1, r0=ACEpot.rnn(:Si), rcut=5.0, rin=1.0, wL=2.0, csp=1.75)
+    if j == 0
+        rcut = 4.25
+        rin = 1.4846606353740674
+        acedescriptors[2] = ACEpot.ACEparams(species = [:Si], nbody=3, pdegree=6, r0=ACEpot.rnn(:Si), rcut=rcut, rin=rin, wL=2.0, csp=1.75)
+    elseif j == 1
+        rcut = 5.25
+        rin = 1.3116157630998344
+        acedescriptors[2] = ACEpot.ACEparams(species = [:Si], nbody=4, pdegree=8, r0=ACEpot.rnn(:Si), rcut=rcut, rin=rin, wL=1.75, csp=1.5)
+    elseif j==2
+        rcut = 5.20147880938817
+        rin = 1.225489959009907
+        acedescriptors[2] = ACEpot.ACEparams(species = [:Si], nbody=2, pdegree=3, r0=ACEpot.rnn(:Si), rcut=rcut, rin=rin, wL=1.5, csp=1.5)
+        acedescriptors[3] = ACEpot.ACEparams(species = [:Si], nbody=4, pdegree=10, r0=ACEpot.rnn(:Si), rcut=rcut, rin=rin, wL=1.25, csp=1.5)
+    elseif j==3 
+        rcut = 5.1908734868935795
+        rin = 1.0731954104455756
+        acedescriptors[2] = ACEpot.ACEparams(species = [:Si], nbody=2, pdegree=3, r0=ACEpot.rnn(:Si), rcut=rcut, rin=rin, wL=1.5, csp=1.5)
+        acedescriptors[3] = ACEpot.ACEparams(species = [:Si], nbody=4, pdegree=12, r0=ACEpot.rnn(:Si), rcut=rcut, rin=rin, wL=1.5, csp=1.5)
+    elseif j==4
+        rcut = 4.284392974485639
+        rin = 0.9421614262208097
+        acedescriptors[2] = ACEpot.ACEparams(species = [:Si], nbody=2, pdegree=12, r0=ACEpot.rnn(:Si), rcut=rcut, rin=rin, wL=1.5, csp=1.5)
+        acedescriptors[3] = ACEpot.ACEparams(species = [:Si], nbody=4, pdegree=12, r0=ACEpot.rnn(:Si), rcut=rcut, rin=rin, wL=1.35, csp=1.25)
+    elseif j==5           
+        rcut = 4.751899598413926 
+        rin = 0.9881479239277131
+        acedescriptors[2] = ACEpot.ACEparams(species = [:Si], nbody=4, pdegree=13, r0=ACEpot.rnn(:Si), rcut=rcut, rin=rin, wL=1.15, csp=1.25)
+    end
+    
+    coeff = linearfit(traindata, acedescriptors, Doptions)
+    energyerrors, forceerrors = Potential.aceerroranalysis(traindata, acedescriptors, Doptions, coeff)
+    energytesterrors, forcetesterrors = Potential.aceerroranalysis(testdata, acedescriptors, Doptions, coeff)
 
-# use least-square method
-method = "lsq" 
+    e1 = [energyerrors[:,1] energyerrors[:,2] 0*energyerrors[:,1]]
+    e2 = [forceerrors[:,1] forceerrors[:,2] 0*forceerrors[:,1]]
+    printerrors(["train"], e1, "Energy Errors")
+    printerrors(["train"], e2, "Force Errors")
 
-# cut-off radius
-rcut = 5.0
+    e1 = [energytesterrors[:,1] energytesterrors[:,2] 0*energytesterrors[:,1]]
+    e2 = [forcetesterrors[:,1] forcetesterrors[:,2] 0*forcetesterrors[:,1]]
+    printerrors(["test"], e1, "Energy Errors")
+    printerrors(["test"], e2, "Force Errors")
 
-# inner radius 
-rin = 0.9
+    Preprocessing.mkfolder("results")
+    writedlm("results/fitacecoeff" * string(j) *  ".txt", coeff)
+    writedlm("results/fitacetrainerror" * string(j) *  ".txt", [energyerrors forceerrors])    
+    writedlm("results/fitacetesterror" * string(j) *  ".txt", [energytesterrors forcetesterrors])    
+end
 
-# bounds for cut-off radius to be optimized
-rcutrange = [3.9, 5.0]
-
-# bounds for inner radius to be optimized
-rinrange = [0.8, 1.4]
-
-# define range for nonlinear parameters to be optimized
-etarange =  hcat(rcutrange, rinrange)'
-
-# number of interpolation points for each nonlinear parameters 
-N = [7,7]
-etaspace = [etarange N]
-
-# optimization parameters
-eta = [rcut, 1.0]; 
-kappa = [0];  
-optim = setoptim(lossfunc, method, eta, kappa, weightouter, etaspace)
-
-# # ZBL reference potential
-# potentials[1] = addpotential("pair", "nonbonded", [1, 1], "zbl", [4.0, 4.8, 73], 4.8);
-# include(potentials[1].potentialfunction * ".jl");  # include the potential file
-
-r0 = ACEpot.rnn(:Si)
-rin = 0.6*r0 
-rcut = 5.0;
-
-# single descriptors to catpure energy of isolated pure elements
-descriptors[1] = POD(nbody=1, pdegree=[0], nbasis = [1], rin = rin, rcut=rcut)
-descriptors[2] = ACEpot.ACEparams(species = [:Si], nbody=4, pdegree=12, r0=r0, rcut=rcut, rin=rin, wL=1.5, csp=1.5)
-
-# linear fit to compute SNAP coefficients
-coeff, ce, cf, cef, cefs = linearfit(traindata, descriptors, potentials, Doptions, optim)
-
-# compute unweighted MAE, RMSE, RSQ errors 
-energyerrors, forceerrors, stresserrors = validate(traindata, descriptors, potentials, Doptions, optim, coeff)    
-
-printerrors(["traing"], energyerrors, "Energy Errors")
-printerrors(["traing"], forceerrors, "Force Errors")
-
-# compute unweighted MAE, RMSE, RSQ errors 
-energytesterrors, forcetesterrors, stresstesterrors = validate(testdata, descriptors, potentials, Doptions, optim, coeff)    
-
-printerrors(["test"], energytesterrors, "Energy Errors")
-printerrors(["test"], forcetesterrors, "Force Errors")
-
+# eta = zeros(6,2)
+# for j = 1:6
+#     tm = readdlm("results/optaceeta" * string(j-1) *  ".txt")
+#     eta[j,:] = tm[:]
+# end
+# show(IOContext(stdout, :compact=>false), "text/plain", eta)

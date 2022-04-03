@@ -12,6 +12,9 @@ using Revise, Preprocessing, Potential, Optimization, DML
 # load Snap library 
 Potential.loadsnap(MLPpath)
 
+# load POD library 
+Potential.loadpod(MLPpath)
+
 # initialize arrays with nothing 
 traindata = Array{Any}(nothing, 100)
 testdata = Array{Any}(nothing, 100)

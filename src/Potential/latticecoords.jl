@@ -7,20 +7,22 @@ function numlattices(rcutmax, pbc, a, b, c)
     p = 0
 
     if pbc[1] == 1
-        m = Int64(ceil(rcutmax/a[1]))
+        m = Int32(ceil(rcutmax/a[1]))
     end
     if pbc[2] == 1
-        n = Int64(ceil(rcutmax/b[2]))
+        n = Int32(ceil(rcutmax/b[2]))
     end
     if d==3
         if pbc[3] == 1
-            p = Int64(ceil(rcutmax/c[3]))
+            p = Int32(ceil(rcutmax/c[3]))
         end
     end
+    # m = m + 1;
+    # n = n + 1;
+    # p = p + 1;
 
     return m, n, p
 end
-
 
 function referenceorigins(m, n, p, d)
 
@@ -62,9 +64,13 @@ end
 function latticecoords(x, rcutmax, pbc, a, b, c)
 
     m, n, p = numlattices(rcutmax, pbc, a, b, c)
-
+    
     latorigins = latticeorigins(a, b, c, m, n, p)
     ind = (m+1) + (2*m+1)*(n) + (2*m+1)*(2*n+1)*(p)
+
+    # display([m n p])
+    # display(latorigins)
+    # error("here")
 
     d = size(x,1)
     nx = size(x,2)
@@ -88,7 +94,7 @@ function latticecoords(x, rcutmax, pbc, a, b, c)
         end
     end
 
-    alist = zeros(Int64,nx*nl)
+    alist = zeros(Int32,nx*nl)
     for i = 1:nl
         for j = 1:nx
             alist[j + nx*(i-1)] = j
@@ -109,8 +115,8 @@ function latticecoords(x, rcutmax, pbc, a, b, c)
     # neighnum = [0; cumsum(neighnum)];
 
     neighi, neighlist, neighnum = neighborlist(y, rcutmax, nx)
-    neighnum = [0; cumsum(neighnum)];
+    neighnumsum = Int32.([0; cumsum(neighnum)]);
     
-    return y, alist, neighlist, neighnum
+    return y, alist, neighlist, neighnumsum, neighnum
 end
 

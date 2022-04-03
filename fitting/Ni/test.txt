@@ -1,0 +1,2 @@
+60
+Lattice="1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0" Properties=species:S:1:pos:r:3:forces:r:3 energy=-10.0 stress="2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0 2.0" pbc="T T T"

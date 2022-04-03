@@ -14,9 +14,10 @@ if (length(c)>2) & (length(pbc) > 2)
 end
 
 #latticemethod = 1
+
 if (latticemethod == 1)    
-    y, alist, neighlist, neighnum = latticecoords(x, rcutmax, pbc, a, b, c)
-    return y, alist, neighlist, neighnum
+    y, alist, neighlist, neighnumsum, neighnum = latticecoords(x, rcutmax, pbc, a, b, c)
+    return y, alist, neighlist, neighnumsum, neighnum
 end
 
 # offset simulation box for periodic boundary conditions
@@ -38,11 +39,11 @@ n = size(x,2);
 # y1, alist1, neighlist1, neighnum1 = latticecoords(x, rcutmax, pbc[:], a[:], b[:], c[:])
 
 neighi, neighlist, neighnum = neighborlist(y, rcutmax, n)
-neighnum = [0; cumsum(neighnum)];
+neighnumsum = Int32.([0; cumsum(neighnum)]);
 # display(maximum(abs.(neighnum1[:]-neighnum[:])))
 # display(maximum(abs.(neighlist1[:]-neighlist[:])))
 
-return y, alist, neighlist, neighnum
+return y, alist, neighlist, neighnumsum, neighnum
 
 end
 

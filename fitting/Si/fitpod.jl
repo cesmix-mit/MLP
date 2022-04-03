@@ -1,15 +1,19 @@
-cdir = pwd(); ii = findlast("MDP", cdir); MDPpath = cdir[1:ii[end]] * "/";    
-include(MDPpath * "Installation/setup.jl");
+cdir = pwd(); ii = findlast("MLP", cdir); MLPpath = cdir[1:ii[end]] * "/";    
+include(MLPpath * "src/setup.jl");
+
+using DelimitedFiles
 
 # path to the database 
 datapath = "../../data/Si/"
 dataformat = "jsonpymatgen"
 fileextension = "json"
 atomspecies = ["Si"];
-folders = ["training"];
 
 # weights for energies, forces, and stresses in the linear fit
-weightinner=[100            1               1.00E-8]
+weightinner=[100  1  1.00E-8]
+
+# weights for energies, forces, and stresses in the outer nonlinear optimization
+weightouter = [0.8, 0.2, 1.0E-8]
 
 # randomly selecting the configurations in the database
 randomize = false;
@@ -27,61 +31,84 @@ rotationmatrix = nothing
 transposelattice = false 
 
 # training data 
-for i = 1:length(folders)
-    traindata[i] = adddata(datapath * folders[i], dataformat, fileextension, 
-                percentage, randomize, atomspecies, weightinner[i,:], translationvector, 
+traindata[1] = adddata(datapath * "training", dataformat, fileextension, 
+            percentage, randomize, atomspecies, weightinner[1,:], translationvector, 
+            rotationmatrix, transposelattice)
+
+# testing data 
+testdata[1] = adddata(datapath * "test", dataformat, fileextension, 
+                percentage, randomize, atomspecies, weightinner[1,:], translationvector, 
                 rotationmatrix, transposelattice)
-end
-
-rcut = 5.0
-rin = 0.9
-
-descriptors[1] = POD(nbody=1, atomtypes=[1], pdegree=[0], nbasis = [1], rin = rin, rcut=rcut)
-
-# descriptors[2] = POD(nbody=2, atomtypes=[1,1], pdegree=[2,6], nbasis = [3], rin = rin, rcut=rcut)
-# descriptors[3] = POD(nbody=3, atomtypes=[1,1,1], pdegree=[2,4,3], nbasis = [3, 3], rin = rin, rcut=rcut)
-# descriptors[2] = POD(nbody=2, atomtypes=[1,1], pdegree=[4,10], nbasis = [12], rin = rin, rcut=rcut, gamma0 = [0.0, 2, 4])
-# descriptors[3] = POD(nbody=3, atomtypes=[1,1,1], pdegree=[4,8,5], nbasis = [12, 5], rin = rin, rcut=rcut, gamma0 = [0.0, 2, 4])
-
-descriptors[2] = POD(nbody=2, pdegree=[4,6], nbasis = [8], rin = rin, rcut=rcut, gamma0 = [0.0, 2, 4])
-descriptors[3] = POD(nbody=3, pdegree=[4,6,5], nbasis = [8, 5], rin = rin, rcut=rcut, gamma0 = [0.0, 2, 4])
-
-# descriptors[2] = initPOD(PODdesc(nbody=2, atomtypes=[1,1], pdegree=[4,6], nbasis = [7], rin = 1.0, rcut=rcut))
-# descriptors[3] = initPOD(PODdesc(nbody=3, atomtypes=[1,1,1], pdegree=[4,6,6], nbasis = [7, 6], rin = 1.0, rcut=rcut))
-
-# single descriptors to catpure energy of isolated pure elements
-# descriptors[1] = PotentialStruct("single", "nonbonded", [1], "single", [0.0], rcut);
-# include(descriptors[1].potentialfunction * ".jl");  # include the descriptors file      
-# descriptors[2] = initPOD(PODdesc(nbody=2, atomtypes=[1,1], pdegree=[6,12], nbasis = [13], rin = rin, rcut=rcut))
-# descriptors[3] = initPOD(PODdesc(nbody=3, atomtypes=[1,1,1], pdegree=[6,12,15], nbasis = [8,15], rin = rin, rcut=rcut))
 
 # Descriptors optional parameters
 Doptions = DescriptorsOptions(pbc = [1, 1, 1], normalizeenergy=true, normalizestress=true)
 
-# loss function style must be: "energy", "force", "energyforce", "energyforcestress"
-lossfunc = "energyforce"
+# Bessel scaling parameters
+gamma = [0.0, 2, 4]
+for j = 0:5    
+    # POD Descriptors
+    if j == 0
+        rcut = 4.279154036156406
+        rin = 0.9
+        descriptors[1] = POD(nbody=1, pdegree=[0], nbasis = [1], rin = rin, rcut=rcut)
+        descriptors[2] = POD(nbody=2, pdegree=[2,4], nbasis = [2], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=false, projectiontol=1e-10)
+        descriptors[3] = POD(nbody=3, pdegree=[2,2,2], nbasis = [1, 2], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=false, projectiontol=1e-10)
+    elseif j == 1
+        rcut = 4.287842639403762
+        rin = 1.4626008660993084
+        descriptors[1] = POD(nbody=1, pdegree=[0], nbasis = [1], rin = rin, rcut=rcut)
+        descriptors[2] = POD(nbody=2, pdegree=[2,6], nbasis = [3], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=false, projectiontol=1e-10)
+        descriptors[3] = POD(nbody=3, pdegree=[2,4,3], nbasis = [3, 3], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=false, projectiontol=1e-10)
+    elseif j==2
+        rcut = 5.126585004741973
+        rin = 1.0407882529057981
+        descriptors[1] = POD(nbody=1, pdegree=[0], nbasis = [1], rin = rin, rcut=rcut)
+        descriptors[2] = POD(nbody=2, pdegree=[3,6], nbasis = [6], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=false, projectiontol=1e-10)
+        descriptors[3] = POD(nbody=3, pdegree=[3,6,4], nbasis = [5, 4], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=false, projectiontol=1e-10)
+    elseif j==3 
+        rcut = 5.1566588199347265
+        rin = 0.9
+        descriptors[1] = POD(nbody=1, pdegree=[0], nbasis = [1], rin = rin, rcut=rcut)
+        descriptors[2] = POD(nbody=2, pdegree=[4,6], nbasis = [8], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=false, projectiontol=1e-10)
+        descriptors[3] = POD(nbody=3, pdegree=[4,6,5], nbasis = [8, 5], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=false, projectiontol=1e-10)
+    elseif j==4
+        rcut = 5.25
+        rin = 0.9613114544981287
+        descriptors[1] = POD(nbody=1, pdegree=[0], nbasis = [1], rin = rin, rcut=rcut)
+        descriptors[2] = POD(nbody=2, pdegree=[6,8], nbasis = [11], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=false, projectiontol=1e-10)
+        descriptors[3] = POD(nbody=3, pdegree=[6,8,7], nbasis = [10, 7], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=false, projectiontol=1e-10)
+    elseif j==5        
+        rcut = 5.239893145443493
+        rin = 0.9815780250870151
+        descriptors[1] = POD(nbody=1, pdegree=[0], nbasis = [1], rin = rin, rcut=rcut)   
+        descriptors[2] = POD(nbody=2, pdegree=[6,12], nbasis = [10], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=false, projectiontol=1e-10)
+        descriptors[3] = POD(nbody=3, pdegree=[6,12,10], nbasis = [12,10], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=false, projectiontol=1e-10)
+    end
+    
+    coeff = linearfit(traindata, descriptors, Doptions)
+    energyerrors, forceerrors = Potential.poderroranalysis(traindata, descriptors, Doptions, coeff)
+    energytesterrors, forcetesterrors = Potential.poderroranalysis(testdata, descriptors, Doptions, coeff)
 
-# use least-square method
-method = "lsq" 
+    e1 = [energyerrors[:,1] energyerrors[:,2] 0*energyerrors[:,1]]
+    e2 = [forceerrors[:,1] forceerrors[:,2] 0*forceerrors[:,1]]
+    printerrors(["train"], e1, "Energy Errors")
+    printerrors(["train"], e2, "Force Errors")
 
-# optimization parameters
-optim = setoptim(lossfunc, method)
+    e1 = [energytesterrors[:,1] energytesterrors[:,2] 0*energytesterrors[:,1]]
+    e2 = [forcetesterrors[:,1] forcetesterrors[:,2] 0*forcetesterrors[:,1]]
+    printerrors(["test"], e1, "Energy Errors")
+    printerrors(["test"], e2, "Force Errors")
 
-# linear fit to compute SNAP coefficients
-coeff, ce, cf, cef, cefs = linearfit(traindata, descriptors, potentials, Doptions, optim)
+    Preprocessing.mkfolder("results")
+    writedlm("results/fitpodcoeff" * string(j) *  ".txt", coeff)
+    writedlm("results/fitpodtrainerror" * string(j) *  ".txt", [energyerrors forceerrors])    
+    writedlm("results/fitpodtesterror" * string(j) *  ".txt", [energytesterrors forcetesterrors])    
+end
 
-print("Coeffficients: "), show(stdout, "text/plain", coeff)
-
-# compute unweighted MAE, RMSE, RSQ errors 
-energyerrors, forceerrors, stresserrors = validate(traindata, descriptors, potentials, Doptions, optim, coeff)    
-
-printerrors(folders, energyerrors, "Energy Errors")
-printerrors(folders, forceerrors, "Force Errors")
-printerrors(folders, stresserrors, "Stress Errors")
-
-err = [energyerrors forceerrors stresserrors]
-using DelimitedFiles
-Preprocessing.mkfolder("results")
-writedlm("results/fitpodcoeff.txt", coeff)
-writedlm("results/fitpoderror.txt", err)
+# eta = zeros(6,2)
+# for j = 1:6
+#     tm = readdlm("results/optpodeta" * string(j-1) *  ".txt")
+#     eta[j,:] = tm[:]
+# end
+# show(IOContext(stdout, :compact=>false), "text/plain", eta)
 
