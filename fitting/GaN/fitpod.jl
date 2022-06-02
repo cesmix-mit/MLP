@@ -21,8 +21,8 @@ weightouter = [0.8, 0.2, 0.0]
 # randomly selecting the configurations in the database
 randomize = false;
 
-# use all the data 
-percentage = 100.0;
+# use percentage of the data 
+percentage = 20.0;
 
 # translate atom positions 
 translationvector = nothing
@@ -35,6 +35,13 @@ transposelattice = false
 
 # training data 
 traindata[1] = adddata(datapath * folders[1], dataformat, fileextension, 
+            percentage, randomize, atomspecies, weightinner[1,:], translationvector, 
+            rotationmatrix, transposelattice)
+
+# randomly selecting the configurations in the database
+randomize = true;
+# test data 
+testdata[1] = adddata(datapath * folders[1], dataformat, fileextension, 
             percentage, randomize, atomspecies, weightinner[1,:], translationvector, 
             rotationmatrix, transposelattice)
 
@@ -60,21 +67,26 @@ for j = 0:4
 
     # POD Descriptors
     if j == 0
-        descriptors[1] = POD(nbody=2, species = [:Ga,:N], pdegree=[2,4], nbasis = [2], rin = rin, rcut=rcut, gamma0 = gamma)
-        descriptors[2] = POD(nbody=3, species = [:Ga,:N], pdegree=[2,2,2], nbasis = [1, 2], rin = rin, rcut=rcut, gamma0 = gamma)
+        descriptors[1] = POD(nbody=1, species = [:Ga,:N], pdegree=[2,4], nbasis = [2], rin = rin, rcut=rcut, gamma0 = gamma)
+        descriptors[2] = POD(nbody=2, species = [:Ga,:N], pdegree=[2,4], nbasis = [2], rin = rin, rcut=rcut, gamma0 = gamma)
+        descriptors[3] = POD(nbody=3, species = [:Ga,:N], pdegree=[2,2,2], nbasis = [1, 2], rin = rin, rcut=rcut, gamma0 = gamma)
     elseif j == 1
         # 3*3 + (3*3+3)*6 = 9 + 12*6 = 81
-        descriptors[1] = POD(nbody=2, species = [:Ga,:N], pdegree=[2,6], nbasis = [3], rin = rin, rcut=rcut, gamma0 = gamma)
-        descriptors[2] = POD(nbody=3, species = [:Ga,:N], pdegree=[2,4,3], nbasis = [3, 3], rin = rin, rcut=rcut, gamma0 = gamma)
+        descriptors[1] = POD(nbody=1, species = [:Ga,:N], pdegree=[2,4], nbasis = [2], rin = rin, rcut=rcut, gamma0 = gamma)
+        descriptors[2] = POD(nbody=2, species = [:Ga,:N], pdegree=[2,6], nbasis = [3], rin = rin, rcut=rcut, gamma0 = gamma)
+        descriptors[3] = POD(nbody=3, species = [:Ga,:N], pdegree=[2,4,3], nbasis = [3, 3], rin = rin, rcut=rcut, gamma0 = gamma)
     elseif j==2
-        descriptors[1] = POD(nbody=2, species = [:Ga,:N], pdegree=[3,6], nbasis = [6], rin = rin, rcut=rcut, gamma0 = gamma)
-        descriptors[2] = POD(nbody=3, species = [:Ga,:N], pdegree=[3,6,4], nbasis = [5, 4], rin = rin, rcut=rcut, gamma0 = gamma)
+        descriptors[1] = POD(nbody=1, species = [:Ga,:N], pdegree=[2,4], nbasis = [2], rin = rin, rcut=rcut, gamma0 = gamma)
+        descriptors[2] = POD(nbody=2, species = [:Ga,:N], pdegree=[3,6], nbasis = [6], rin = rin, rcut=rcut, gamma0 = gamma)
+        descriptors[3] = POD(nbody=3, species = [:Ga,:N], pdegree=[3,6,4], nbasis = [5, 4], rin = rin, rcut=rcut, gamma0 = gamma)
     elseif j==3 
-        descriptors[1] = POD(nbody=2, species = [:Ga,:N], pdegree=[4,6], nbasis = [8], rin = rin, rcut=rcut, gamma0 = gamma)
-        descriptors[2] = POD(nbody=3, species = [:Ga,:N], pdegree=[4,6,5], nbasis = [8, 5], rin = rin, rcut=rcut, gamma0 = gamma)
+        descriptors[1] = POD(nbody=1, species = [:Ga,:N], pdegree=[2,4], nbasis = [2], rin = rin, rcut=rcut, gamma0 = gamma)
+        descriptors[2] = POD(nbody=2, species = [:Ga,:N], pdegree=[4,6], nbasis = [8], rin = rin, rcut=rcut, gamma0 = gamma)
+        descriptors[3] = POD(nbody=3, species = [:Ga,:N], pdegree=[4,6,5], nbasis = [8, 5], rin = rin, rcut=rcut, gamma0 = gamma)
     elseif j==4
-        descriptors[1] = POD(nbody=2, species = [:Ga,:N], pdegree=[6,8], nbasis = [11], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=true, projectiontol=1e-6)
-        descriptors[2] = POD(nbody=3, species = [:Ga,:N], pdegree=[6,8,7], nbasis = [10, 7], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=true, projectiontol=1e-6)
+        descriptors[1] = POD(nbody=1, species = [:Ga,:N], pdegree=[2,4], nbasis = [2], rin = rin, rcut=rcut, gamma0 = gamma)
+        descriptors[2] = POD(nbody=2, species = [:Ga,:N], pdegree=[6,8], nbasis = [11], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=true, projectiontol=1e-6)
+        descriptors[3] = POD(nbody=3, species = [:Ga,:N], pdegree=[6,8,7], nbasis = [10, 7], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=true, projectiontol=1e-6)
     elseif j==5           
         descriptors[1] = POD(nbody=2, species = [:Ga,:N], pdegree=[6,12], nbasis = [10], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=true, projectiontol=1e-6)
         descriptors[2] = POD(nbody=3, species = [:Ga,:N], pdegree=[6,12,10], nbasis = [12,10], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=true, projectiontol=1e-6)
@@ -88,8 +100,16 @@ for j = 0:4
     printerrors(["train"], e1, "Energy Errors")
     printerrors(["train"], e2, "Force Errors")
 
-    Preprocessing.mkfolder("results")
-    writedlm("results/fitpodcoeff" * string(j) *  ".txt", coeff)
-    writedlm("results/fitpodtrainerror" * string(j) *  ".txt", [energyerrors forceerrors])    
+    energytesterrors, forcetesterrors = Potential.poderroranalysis(testdata, descriptors, Doptions, coeff)
+
+    e1 = [energytesterrors[:,1] energytesterrors[:,2] 0*energytesterrors[:,1]]
+    e2 = [forcetesterrors[:,1] forcetesterrors[:,2] 0*forcetesterrors[:,1]]
+    printerrors(["test"], e1, "Energy Errors")
+    printerrors(["test"], e2, "Force Errors")
+
+    # Preprocessing.mkfolder("results")
+    # writedlm("results/fitpodcoeff" * string(j) *  ".txt", coeff)
+    # writedlm("results/fitpodtrainerror" * string(j) *  ".txt", [energyerrors forceerrors])    
+    # writedlm("results/fitpodtesterror" * string(j) *  ".txt", [energytesterrors forcetesterrors])    
 end
 

@@ -55,10 +55,10 @@ lossfunc = "energyforce"
 method = "lsq" 
 
 # cut-off radius
-rcut = 4.0
+rcut = 4.8
 
 # inner radius 
-rin = 0.8
+rin = 0.5
 
 # optimization parameters
 optim = setoptim(lossfunc, method)
@@ -66,35 +66,44 @@ optim = setoptim(lossfunc, method)
 # Bessel scaling parameters
 gamma = [0.0, 2, 4]
 #gamma = [0.0, 4.0]
-j = 1;
+j = 4;
 # POD Descriptors
 if j == 0
     descriptors[1] = POD(nbody=2, species = [:Hf,:O], pdegree=[2,4], nbasis = [2], rin = rin, rcut=rcut, gamma0 = gamma)
     descriptors[2] = POD(nbody=3, species = [:Hf,:O], pdegree=[2,2,2], nbasis = [1, 2], rin = rin, rcut=rcut, gamma0 = gamma)
 elseif j == 1
-    descriptors[1] = POD(nbody=2, species = [:Hf,:O], pdegree=[2,6], nbasis = [3], rin = rin, rcut=rcut, gamma0 = gamma)
-    descriptors[2] = POD(nbody=3, species = [:Hf,:O], pdegree=[2,4,3], nbasis = [3, 3], rin = rin, rcut=rcut, gamma0 = gamma)
+    descriptors[1] = POD(nbody=1, species = [:Hf,:O], pdegree=[0], nbasis = [1], rin = rin, rcut=rcut)
+    descriptors[2] = POD(nbody=2, species = [:Hf,:O], pdegree=[2,6], nbasis = [3], rin = rin, rcut=rcut, gamma0 = gamma)
+    descriptors[3] = POD(nbody=3, species = [:Hf,:O], pdegree=[2,4,3], nbasis = [3, 3], rin = rin, rcut=rcut, gamma0 = gamma)
 elseif j==2
-    descriptors[1] = POD(nbody=2, species = [:Hf,:O], pdegree=[3,6], nbasis = [6], rin = rin, rcut=rcut, gamma0 = gamma)
-    descriptors[2] = POD(nbody=3, species = [:Hf,:O], pdegree=[3,6,4], nbasis = [5, 4], rin = rin, rcut=rcut, gamma0 = gamma)
+    descriptors[1] = POD(nbody=1, species = [:Hf,:O], pdegree=[0], nbasis = [1], rin = rin, rcut=rcut)
+    descriptors[2] = POD(nbody=2, species = [:Hf,:O], pdegree=[3,6], nbasis = [6], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=true, projectiontol=1e-8)
+    descriptors[3] = POD(nbody=3, species = [:Hf,:O], pdegree=[3,6,4], nbasis = [5, 4], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=true, projectiontol=1e-8)
 elseif j==3 
-    descriptors[1] = POD(nbody=2, species = [:Hf,:O], pdegree=[4,6], nbasis = [8], rin = rin, rcut=rcut, gamma0 = gamma)
-    descriptors[2] = POD(nbody=3, species = [:Hf,:O], pdegree=[4,6,5], nbasis = [8, 5], rin = rin, rcut=rcut, gamma0 = gamma)
+    descriptors[1] = POD(nbody=1, species = [:Hf,:O], pdegree=[0], nbasis = [1], rin = rin, rcut=rcut)
+    descriptors[2] = POD(nbody=2, species = [:Hf,:O], pdegree=[4,6], nbasis = [8], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=true, projectiontol=1e-8)
+    descriptors[3] = POD(nbody=3, species = [:Hf,:O], pdegree=[4,6,5], nbasis = [8, 5], rin = rin, rcut=rcut, gamma0 = gamma, hybrid23=true, projectiontol=1e-8)
+    #descriptors[2] = POD(nbody=2, species = [:Hf,:O], pdegree=[4,6], nbasis = [8], rin = rin, rcut=rcut, gamma0 = gamma, b2b2=16, b2b3=16)
+    #descriptors[3] = POD(nbody=3, species = [:Hf,:O], pdegree=[4,6,5], nbasis = [8, 5], rin = rin, rcut=rcut, gamma0 = gamma, b2b3=50, b3b3=50)
 elseif j==4
-    descriptors[1] = POD(nbody=2, species = [:Hf,:O], pdegree=[6,8], nbasis = [11], rin = rin, rcut=rcut, gamma0 = gamma)
-    descriptors[2] = POD(nbody=3, species = [:Hf,:O], pdegree=[6,8,7], nbasis = [10, 7], rin = rin, rcut=rcut, gamma0 = gamma)
+    descriptors[1] = POD(nbody=1, species = [:Hf,:O], pdegree=[0], nbasis = [1], rin = rin, rcut=rcut)
+    descriptors[2] = POD(nbody=2, species = [:Hf,:O], pdegree=[6,8], nbasis = [11], rin = rin, rcut=rcut, gamma0 = gamma)
+    descriptors[3] = POD(nbody=3, species = [:Hf,:O], pdegree=[6,8,7], nbasis = [10, 7], rin = rin, rcut=rcut, gamma0 = gamma)
 elseif j==5           
     descriptors[1] = POD(nbody=2, species = [:Hf,:O], pdegree=[6,12], nbasis = [10], rin = rin, rcut=rcut, gamma0 = gamma)
     descriptors[2] = POD(nbody=3, species = [:Hf,:O], pdegree=[6,12,10], nbasis = [12,10], rin = rin, rcut=rcut, gamma0 = gamma)
 end
 
-Potential.podprojection(testdata, descriptors, Doptions.pbc)
+coeff = linearfit(testdata, descriptors, Doptions)
+energyerrors, forceerrors = Potential.poderroranalysis(testdata, descriptors, Doptions, coeff)
 
-# linear fit to compute POD coefficients
-coeff, ce, cf, cef, cefs = linearfit(testdata, descriptors, potentials, Doptions, optim)
+# Potential.podprojection(testdata, descriptors, Doptions.pbc)
 
-# compute unweighted MAE, RMSE, RSQ errors 
-energyerrors, forceerrors, stresserrors, eerr, ferr = Optimization.erroranalysis(validdata, descriptors, potentials, Doptions, optim, coeff)    
+# # linear fit to compute POD coefficients
+# coeff, ce, cf, cef, cefs = linearfit(testdata, descriptors, potentials, Doptions, optim)
+
+# # compute unweighted MAE, RMSE, RSQ errors 
+# energyerrors, forceerrors, stresserrors, eerr, ferr = Optimization.erroranalysis(validdata, descriptors, potentials, Doptions, optim, coeff)    
 #config, indices = Preprocessing.readconfigdata(testdata[1])     
 
 # printerrors("train", energyerrors, "Energy Errors")

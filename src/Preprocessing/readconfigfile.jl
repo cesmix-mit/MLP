@@ -22,6 +22,8 @@ function readconfigfile(datapath, datafile, dataformat, datamode, atomspecies,
         config = readJSON(filename, atomspecies);    
     elseif style == "jsonpymatgen" 
         config = readJSONpymatgen(filename, atomspecies);            
+    elseif style == "ann" 
+        config = readANN(filename, atomspecies);                 
     end
     
     config.nconfigs = length(config.natom); # number of configurations
@@ -145,6 +147,7 @@ function readconfigpath(datapath, dataformat, fileextension, atomspecies,
         datafile = files[i]
         ii = findlast(".", datafile)
         ext = datafile[(ii[end]+1):end]    
+        display(datafile)
         if (fileextension == lowercase(ext)) | (fileextension == "all")
             config2 = readconfigfile(datapath, datafile, dataformat, datamode, atomspecies, transposelattice, pbc, original)
             config = catconfig(config, config2)
@@ -154,22 +157,88 @@ function readconfigpath(datapath, dataformat, fileextension, atomspecies,
     return config
 end
 
+function randomizeconfig(config, randomize, percentage)
+    nconfigs = config.nconfigs
+    if nconfigs < 100 
+        return config
+    end
+
+    n = Int32(round(percentage*nconfigs/100.0))       
+    indices = Array(1:n)     
+    if randomize==1
+        ind = randperm(nconfigs)
+        indices = ind[1:n]        
+    elseif randomize==0
+        indices = Int32.(round.(LinRange(1, nconfigs, n)))            
+    end    
+    #display(indices)
+            
+    config = extractconfig(config, indices)
+
+    return config
+end
+
+function readconfigpath2(datapath, dataformat, fileextension, atomspecies, randomize, percentage,
+    transposelattice=nothing, pbc=nothing, original=0)
+
+    fileextension = lowercase(fileextension)
+    datamode = (fileextension == "bin") ? 0 : 1
+        
+    files = readdir(datapath)
+
+    j = 0;
+    for i = 1:length(files)
+        datafile = files[i]
+        ii = findlast(".", datafile)
+        ext = datafile[(ii[end]+1):end]    
+        if (fileextension == lowercase(ext)) | (fileextension == "all")
+            j = i
+            break
+        end
+    end
+    
+    datafile = files[j]
+    config = readconfigfile(datapath, datafile, dataformat, datamode, atomspecies, transposelattice, pbc, original)    
+    config = randomizeconfig(config, randomize, percentage)
+    maxconfigs = config.nconfigs
+
+    for i = (j+1):length(files)
+        datafile = files[i]
+        ii = findlast(".", datafile)
+        ext = datafile[(ii[end]+1):end]    
+        if (fileextension == lowercase(ext)) | (fileextension == "all")
+            config2 = readconfigfile(datapath, datafile, dataformat, datamode, atomspecies, transposelattice, pbc, original)
+            config2 = randomizeconfig(config2, randomize, percentage)
+            maxconfigs = max(maxconfigs,config2.nconfigs)
+            config = catconfig(config, config2)
+        end
+    end
+    
+    return config, maxconfigs
+end
+
 function readconfigdata(data, pbc=nothing, a=nothing, b=nothing, c=nothing)
 
     datapath, dataformat, fileextension, percentage, randomize, atomspecies, 
             weight, translation, rotation, transposelattice  = getdata(data)
-    config = readconfigpath(datapath, dataformat, fileextension, atomspecies, transposelattice, pbc)
-    config.nconfigs = length(config.natom)
-
-    if randomize==1
-        ind = randperm(config.nconfigs)
-    else
-        ind = Array(1:config.nconfigs)
-    end
-    ntrain = Int64(round(percentage*config.nconfigs/100.0))        
-    indices = ind[1:ntrain]    
     
-    config = extractconfig(config, indices)
+    config, maxconfigs = readconfigpath2(datapath, dataformat, fileextension, atomspecies, randomize, percentage, transposelattice, pbc)
+        
+    if maxconfigs < 100
+        config.nconfigs = length(config.natom)
+        ntrain = Int64(round(percentage*config.nconfigs/100.0)) 
+        indices = Array(1:ntrain)     
+        if randomize==1
+            ind = randperm(config.nconfigs)
+            indices = ind[1:ntrain]        
+        elseif randomize==0
+            indices = Int32.(round.(LinRange(1, config.nconfigs, ntrain)))            
+        end          
+        config = extractconfig(config, indices)
+    else
+        indices = 0
+    end
+
     config.we = reshape([weight[1]],(1,1))
     config.wf = reshape([weight[2]],(1,1))
     config.ws = reshape([weight[3]],(1,1))

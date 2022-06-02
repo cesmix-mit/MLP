@@ -1,5 +1,6 @@
 # Add MDP to Julia search path
 push!(LOAD_PATH, MLPpath * "src/Preprocessing");
+push!(LOAD_PATH, MLPpath * "src/ACG");
 push!(LOAD_PATH, MLPpath * "src/Potential");
 push!(LOAD_PATH, MLPpath * "src/Optimization");
 push!(LOAD_PATH, MLPpath * "src/DML");

@@ -21,8 +21,8 @@ weightouter = [0.8, 0.2, 0.0]
 # randomly selecting the configurations in the database
 randomize = false;
 
-# use all the data 
-percentage = 100.0;
+# use 20% the data 
+percentage = 20.0;
 
 # translate atom positions 
 translationvector = nothing
@@ -38,12 +38,19 @@ traindata[1] = adddata(datapath * folders[1], dataformat, fileextension,
             percentage, randomize, atomspecies, weightinner[1,:], translationvector, 
             rotationmatrix, transposelattice)
 
+# randomly selecting the configurations in the database
+randomize = true;
+# test data 
+testdata[1] = adddata(datapath * folders[1], dataformat, fileextension, 
+            percentage, randomize, atomspecies, weightinner[1,:], translationvector, 
+            rotationmatrix, transposelattice)
+
 # Descriptors optional parameters
 Doptions = DescriptorsOptions(pbc = [1, 1, 1], normalizeenergy=true, normalizestress=true)
 
 wj = [1.0, 0.9590493408]
 radelem = [0.5, 0.417932464]
-bzeroflag = 1
+bzeroflag = 0
 chemflag = 0
 
 # cut-off radius
@@ -60,7 +67,9 @@ for j = 0:4
     display([j twojmx rcut])
 
     # SNAP descriptors
-    descriptors[1] = SNAPparams(species = [:Ga,:N], twojmax = twojmx, rcutfac = rcut, rfac0 = 0.99363, 
+    descriptors[1] = SNAPparams(species = [:Ga,:N], nbody = 1, twojmax = twojmx, rcutfac = rcut, rfac0 = 0.99363, 
+        elemradius = radelem, elemweight = wj, bzeroflag = bzeroflag, chemflag=chemflag)
+    descriptors[2] = SNAPparams(species = [:Ga,:N], twojmax = twojmx, rcutfac = rcut, rfac0 = 0.99363, 
         elemradius = radelem, elemweight = wj, bzeroflag = bzeroflag, chemflag=chemflag)
 
     coeff = linearfit(traindata, descriptors, Doptions)
@@ -71,8 +80,16 @@ for j = 0:4
     printerrors(["train"], e1, "Energy Errors")
     printerrors(["train"], e2, "Force Errors")
 
+    energytesterrors, forcetesterrors = Potential.snaperroranalysis(testdata, descriptors, Doptions, coeff)
+
+    e1 = [energytesterrors[:,1] energytesterrors[:,2] 0*energytesterrors[:,1]]
+    e2 = [forcetesterrors[:,1] forcetesterrors[:,2] 0*forcetesterrors[:,1]]
+    printerrors(["test"], e1, "Energy Errors")
+    printerrors(["test"], e2, "Force Errors")
+
     Preprocessing.mkfolder("results")
     writedlm("results/fitsnapcoeff" * string(j) *  ".txt", coeff)
     writedlm("results/fitsnaptrainerror" * string(j) *  ".txt", [energyerrors forceerrors])    
+    writedlm("results/fitsnaptesterror" * string(j) *  ".txt", [energytesterrors forcetesterrors])    
 end
 

@@ -21,6 +21,13 @@ include("clebschgordan.jl")
     U::Matrix{Float64} = zeros(1,1) # projection matrix 
     hybrid23::Bool = false
     projectiontol::Float64 = 1e-11  
+    b2b2::Int64 = 0
+    b2b3::Int64 = 0
+    b2b4::Int64 = 0
+    b3b3::Int64 = 0
+    b3b4::Int64 = 0
+    b4b4::Int64 = 0
+    b2b3b4::Int64 = 0
 end
 
 function initPOD(pod::PODdesc)
@@ -55,7 +62,14 @@ function POD(; name::String = "POD",
     Upsilon::Vector{Float64} = [0.0],  # angular eigenvalues
     U::Matrix{Float64} = zeros(1,1), #  projection matrix 
     hybrid23::Bool = false,
-    projectiontol::Float64 = 1e-11   
+    projectiontol::Float64 = 1e-11,
+    b2b2::Int64 = 0, 
+    b2b3::Int64 = 0, 
+    b2b4::Int64 = 0, 
+    b3b3::Int64 = 0, 
+    b3b4::Int64 = 0, 
+    b4b4::Int64 = 0, 
+    b2b3b4::Int64 = 0   
     )
         
     if length(nbasis) > 1
@@ -64,7 +78,8 @@ function POD(; name::String = "POD",
         sh = SHBasis(1) 
     end
     pod = initPOD(PODdesc(name, nbody, species, atomtypes, pdegree, nbasis, rcut, rin, gamma0, 
-                theta0, Phi, Psi, Lambda, Upsilon, sh, U, hybrid23, projectiontol))
+                theta0, Phi, Psi, Lambda, Upsilon, sh, U, hybrid23, projectiontol, b2b2, b2b3,
+                b2b4, b3b3, b3b4, b4b4, b2b3b4))
 
     return pod 
 end
@@ -1078,6 +1093,23 @@ function radialsphericalharmonicbasis_sum(phi, ai, N)
     return A
 end
 
+function radialsphericalharmonicbasis_sum(phi, ai, tj, S, N)
+
+    Nij, M, K = size(phi)
+    A = zeros(Complex{Float64}, N, M, K, S)
+    for k = 1:K     
+        for m = 1:M
+            for n = 1:Nij 
+                ii = ai[n]
+                sj = tj[n]
+                A[ii,m,k,sj] += phi[n,m,k]
+            end
+        end
+    end              
+
+    return A
+end
+
 function powerspectrum(Ar, Ai, dAr, dAi, ai, aj, sh::SHBasis)
 
     N, M, K = size(Ar)
@@ -1131,7 +1163,7 @@ function powerspectrum(Ar, Ai, dAr, dAi, ai, aj, sh::SHBasis)
     return ps, dps   
 end
 
-function bispectrum(Ar, Ai, dAr, dAi, ai, aj, pairnum, sh::SHBasis)
+function bispectrum(Ar, Ai, dAr, dAi, ai, aj, pairnumsum, sh::SHBasis)
 
     cg = sh.cg
     indl = sh.indl 
@@ -1175,7 +1207,7 @@ function bispectrum(Ar, Ai, dAr, dAi, ai, aj, pairnum, sh::SHBasis)
     dim, Nij, M, K = size(dAr)
     dbsa = zeros(dim,Nij,J,K);        
     Q = size(indm,1);
-    bispectrumderiv(dbsa, Ar, Ai, dAr, dAi, cg, pairnum, indl, indm, rowm, 
+    bispectrumderiv(dbsa, Ar, Ai, dAr, dAi, cg, pairnumsum, indl[:], indm[:], rowm, 
         Int32(K), Int32(J), Int32(Q), Int32(M), Int32(N), Int32(Nij));
 
     dbs = zeros(dim,N,J,K);        
@@ -1229,6 +1261,232 @@ function bispectrumdescriptors(x, t, a, b, c, pbc, rcutmax, pod::PODdesc)
     end
 
     return d, dbs, dv
+end
+
+function bispectrum(Ar, Ai, dAr, dAi, t, ai, aj, ti, tj, pairnumsum, pod::PODdesc)
+
+    sh = pod.sh
+    S = length(pod.species)
+
+    cg = sh.cg
+    indl = sh.indl 
+    indm = sh.indm
+    rowm = sh.rowm 
+    
+    J = size(indl,1);
+    N, M, K = size(Ar)
+    bs = zeros(N,J,K,S);    
+    for k = 1:K     
+        for j = 1:J
+            l2 = indl[j,1];
+            l1 = indl[j,2];
+            l  = indl[j,3];                                     
+            nm = rowm[j+1]-rowm[j];       
+            for n = 1:N 
+                tmp = 0.0;
+                for i = 1:nm
+                    q = rowm[j]+i
+                    c = cg[q];
+                    m2 = indm[q,1];
+                    m1 = indm[q,2];
+                    m  = indm[q,3];
+                    a1 = Ar[n,m + l + (l*l) + 1,k]
+                    b1 = Ai[n,m + l + (l*l) + 1,k]
+                    a2 = Ar[n,m1 + l1 + (l1*l1) + 1,k]
+                    b2 = Ai[n,m1 + l1 + (l1*l1) + 1,k]
+                    a3 = Ar[n,m2 + l2 + (l2*l2) + 1,k]
+                    b3 = Ai[n,m2 + l2 + (l2*l2) + 1,k]
+                    tmp = tmp + c*(a1*a2*a3 + a2*b1*b3 + a3*b1*b2 - a1*b2*b3);                         
+                end      
+                bs[n,j,k,t[n]] = tmp
+            end
+        end
+    end
+
+    bs = reshape(bs, (N, J*K*S)) 
+    if (dAr === nothing) | (dAi === nothing) 
+        return bs 
+    end
+    
+    dim, Nij, M, K = size(dAr)
+    dbsa = zeros(dim,Nij,J,K);        
+    Q = size(indm,1);
+    bispectrumderiv(dbsa, Ar, Ai, dAr, dAi, cg, pairnumsum, indl[:], indm[:], rowm, 
+        Int32(K), Int32(J), Int32(Q), Int32(M), Int32(N), Int32(Nij));
+
+    dbs = zeros(dim,N,J,K,S);        
+    for n = 1:Nij
+        ii = ai[n]
+        ij = aj[n]
+        t1 = ti[n]
+        for k = 1:K     
+            for j = 1:J
+                dbs[1,ii,j,k,t1] += dbsa[1,n,j,k]
+                dbs[1,ij,j,k,t1] -= dbsa[1,n,j,k]
+                dbs[2,ii,j,k,t1] += dbsa[2,n,j,k]
+                dbs[2,ij,j,k,t1] -= dbsa[2,n,j,k]                     
+                dbs[3,ii,j,k,t1] += dbsa[3,n,j,k]
+                dbs[3,ij,j,k,t1] -= dbsa[3,n,j,k]                     
+            end
+        end
+    end
+    dbs = reshape(dbs, (dim*N, J*K*S)) 
+
+    return bs, dbs   
+end
+
+function bispectrum2(Ar, Ai, dAr, dAi, t, ai, aj, ti, tj, pairnumsum, pod::PODdesc)
+
+    sh = pod.sh
+    S = length(pod.species)
+
+    cg = sh.cg
+    indl = sh.indl 
+    indm = sh.indm
+    rowm = sh.rowm 
+    
+    J = size(indl,1);
+    N, M, K = size(Ar)
+    bs = zeros(N,J,K,S,S);    
+    for k = 1:K     
+        for j = 1:J
+            l2 = indl[j,1];
+            l1 = indl[j,2];
+            l  = indl[j,3];                                     
+            nm = rowm[j+1]-rowm[j];       
+            for n = 1:N 
+                for sj = 1:S
+                    tmp = 0.0;                
+                    for i = 1:nm
+                        q = rowm[j]+i
+                        c = cg[q];
+                        m2 = indm[q,1];
+                        m1 = indm[q,2];
+                        m  = indm[q,3];
+                        a1 = Ar[n,m + l + (l*l) + 1,k,sj]
+                        b1 = Ai[n,m + l + (l*l) + 1,k,sj]
+                        a2 = Ar[n,m1 + l1 + (l1*l1) + 1,k,sj]
+                        b2 = Ai[n,m1 + l1 + (l1*l1) + 1,k,sj]
+                        a3 = Ar[n,m2 + l2 + (l2*l2) + 1,k,sj]
+                        b3 = Ai[n,m2 + l2 + (l2*l2) + 1,k,sj]
+                        tmp = tmp + c*(a1*a2*a3 + a2*b1*b3 + a3*b1*b2 - a1*b2*b3);                         
+                    end      
+                    bs[n,j,k,t[n],sj] = tmp
+                end
+            end
+        end
+    end
+
+    bs = reshape(bs, (N, J*K*S*S)) 
+    if (dAr === nothing) | (dAi === nothing) 
+        return bs 
+    end
+    
+    dim, Nij, M, K = size(dAr)
+    dbsa = zeros(dim,Nij,J,K);        
+    Q = size(indm,1);
+    bispectrumderiv(dbsa, Ar, Ai, dAr, dAi, cg, pairnumsum, indl[:], indm[:], rowm, 
+        Int32(K), Int32(J), Int32(Q), Int32(M), Int32(N), Int32(Nij));
+
+    dbs = zeros(dim,N,J,K,S,S);        
+    for n = 1:Nij
+        ii = ai[n]
+        ij = aj[n]
+        t1 = ti[n]
+        t2 = tj[n]
+        for k = 1:K     
+            for j = 1:J
+                dbs[1,ii,j,k,t1,t2] += dbsa[1,n,j,k]
+                dbs[1,ij,j,k,t1,t2] -= dbsa[1,n,j,k]
+                dbs[2,ii,j,k,t1,t2] += dbsa[2,n,j,k]
+                dbs[2,ij,j,k,t1,t2] -= dbsa[2,n,j,k]                     
+                dbs[3,ii,j,k,t1,t2] += dbsa[3,n,j,k]
+                dbs[3,ij,j,k,t1,t2] -= dbsa[3,n,j,k]                     
+            end
+        end
+    end
+    dbs = reshape(dbs, (dim*N, J*K*S*S)) 
+
+    return bs, dbs   
+end
+
+function fourbodyeatom(x, t, a, b, c, pbc, pod::PODdesc)
+
+    rcut = pod.rcut 
+    y, alist, neighlist, pairnumsum, pairnum = fullneighborlist(x, a, b, c, pbc, rcut);
+
+    Nij = length(neighlist)        
+    if Nij > 0
+        dim, natom = size(x)
+
+        pairlist = Int32.(neighlist[:].-1)
+        alist = Int32.(alist.-1)
+        atomtype = Int32.(t[:])        
+
+        rij = zeros(3,Nij) 
+        ai = zeros(Int32,Nij)    
+        aj = zeros(Int32,Nij)  
+        ti = zeros(Int32,Nij)      
+        tj = zeros(Int32,Nij)        
+        NeighPairs(rij, y, ai, aj, ti, tj, pairlist, pairnumsum, atomtype, 
+            alist, Int32(natom), Int32(dim))
+
+        ai = ai .+ Int32(1)
+        aj = aj .+ Int32(1)    
+        phi, dphi = radialsphericalharmonicbasis(pod, rij);
+        A = radialsphericalharmonicbasis_sum(phi, ai, natom);
+        #eatom = bispectrum(real(A), imag(A), nothing, nothing, ai, aj, Int32.(pairnumsum), pod.sh);             
+        #N,J,K = size(eatom)
+        #eatom = reshape(eatom, (N, J*K))
+        eatom = bispectrum(real(A), imag(A), nothing, nothing, t, ai, aj, ti, tj, Int32.(pairnumsum), pod);             
+        return eatom
+    else
+        dim, N = size(x)        
+        J = size(pod.sh.indl,1);
+        K = size(pod.Phi,2)
+        eatom = zeros(N, J*K)
+        return eatom, fatom 
+    end
+end
+
+function fourbodyefatom(x, t, a, b, c, pbc, pod::PODdesc)
+
+    rcut = pod.rcut 
+    y, alist, neighlist, pairnumsum, pairnum = fullneighborlist(x, a, b, c, pbc, rcut);
+
+    Nij = length(neighlist)        
+    if Nij > 0
+        dim, natom = size(x)
+        pairlist = Int32.(neighlist[:].-1)
+        alist = Int32.(alist.-1)
+        atomtype = Int32.(t[:])        
+
+        rij = zeros(3,Nij) 
+        ai = zeros(Int32,Nij)    
+        aj = zeros(Int32,Nij)  
+        ti = zeros(Int32,Nij)      
+        tj = zeros(Int32,Nij)        
+        NeighPairs(rij, y, ai, aj, ti, tj, pairlist, pairnumsum, atomtype, 
+            alist, Int32(natom), Int32(dim))
+
+        ai = ai .+ Int32(1)
+        aj = aj .+ Int32(1)                
+        phi, dphi = radialsphericalharmonicbasis(pod, rij);
+        A = radialsphericalharmonicbasis_sum(phi, ai, natom);
+        # eatom, fatom = bispectrum(real(A), imag(A), real(dphi), imag(dphi), ai, aj, Int32.(pairnumsum), pod.sh);                    
+        # dim,N,J,K = size(fatom)
+        # eatom = reshape(eatom, (N, J*K))
+        # fatom = reshape(fatom, (dim*N, J*K))
+        eatom, fatom = bispectrum(real(A), imag(A), real(dphi), imag(dphi), t, ai, aj, ti, tj, Int32.(pairnumsum), pod);             
+        return eatom, fatom 
+    else
+        dim, N = size(x)        
+        J = size(pod.sh.indl,1);
+        K = size(pod.Phi,2)
+        eatom = zeros(N, J*K)
+        fatom = zeros(dim*N, J*K)
+        return eatom, fatom 
+    end
 end
 
 function PODdescriptors(x, t, a, b, c, pbc, rcutmax, pod::PODdesc)
@@ -1333,19 +1591,23 @@ function podprojection(data, descriptors, pbc=nothing, a=nothing, b=nothing, c=n
     n = length(data)
     B2 = 0.0
     B3 = 0.0
+    B4 = 0.0
     K2 = 0
     K3 = 0
+    K4 = 0
     for i = 1:n
         if typeof(data[i]) == Preprocessing.DataStruct
             config, ~ = Preprocessing.readconfigdata(data[i], pbc, a, b, c)                  
         else
             config = data[i]
         end
-        A2, A3, N2, N3 = podeatom(config, descriptors)        
+        A2, A3, A4, N2, N3, N4 = podeatom(config, descriptors)        
         B2 = B2 .+ A2
-        B3 = B3 .+ A3 
+        B3 = B3 .+ A3
+        B4 = B4 .+ A4 
         K2 = K2 + N2
         K3 = K3 + N3
+        K4 = K4 + N4
     end    
 
     if K2 > 0
@@ -1376,12 +1638,29 @@ function podprojection(data, descriptors, pbc=nothing, a=nothing, b=nothing, c=n
         U3 = U3[:,1:n3];    
     end
 
+    if K4 > 0
+        projectiontol = 1e-11
+        for n = 1:length(descriptors)
+            if (descriptors[n].name == "POD") & (descriptors[n].nbody==4) 
+                projectiontol = descriptors[n].projectiontol
+                break 
+            end
+        end
+        B4 = (1.0/K4)*B4
+        U4, s4 = eigenvalues(B4)    
+        n4 = numbasis(s4, projectiontol);    
+        U4 = U4[:,1:n4];    
+    end
+
     for n = 1:length(descriptors)
         if (descriptors[n].name == "POD") & (descriptors[n].nbody==2) 
             descriptors[n].U = U2 
         end
         if (descriptors[n].name == "POD") & (descriptors[n].nbody==3) 
             descriptors[n].U = U3
+        end
+        if (descriptors[n].name == "POD") & (descriptors[n].nbody==4) 
+            descriptors[n].U = U4
         end
     end    
     return descriptors
@@ -1429,8 +1708,10 @@ natom = [0; cumsum(config.natom[:])];
 
 A2 = 0.0
 A3 = 0.0
+A4 = 0.0
 N2 = 0
 N3 = 0 
+N4 = 0
 for i = 1:nconfigs
     ci = i
     x, t, a, b, c, pbc = getconfig(config, natom, ci)
@@ -1446,19 +1727,92 @@ for i = 1:nconfigs
             A3 = A3 .+ eatom'*eatom 
             N3 = N3 .+ size(eatom,1)
         end
+        if (descriptors[n].name == "POD") & (descriptors[n].nbody==4) 
+            eatom = fourbodyeatom(x, t, a[:], b[:], c[:], pbc[:], descriptors[n])                
+            A4 = A4 .+ eatom'*eatom 
+            N4 = N4 .+ size(eatom,1)
+        end
     end
 end
 
-return A2, A3, N2, N3
+return A2, A3, A4, N2, N3, N4 
 
 end
 
+function PODglobaldescriptors(x, t, a, b, c, pbc, descriptors)
+
+for n = 1:length(descriptors)
+    if (descriptors[n].name == "POD") & (descriptors[n].nbody==1) 
+        eatom1, fatom1 = onebodyefatom(x, t, a[:], b[:], c[:], pbc[:], descriptors[n])                                        
+        globd1 = sum(eatom1, dims=1)            
+    end    
+    if (descriptors[n].name == "POD") & (descriptors[n].nbody==2) 
+        eatom1 = twobodyeatom(x, t, a[:], b[:], c[:], pbc[:], descriptors[n])                            
+        globd1 = sum(eatom1, dims=1)
+    end
+    if (descriptors[n].name == "POD") & (descriptors[n].nbody==3) 
+        eatom1 = threebodyeatom(x, t, a[:], b[:], c[:], pbc[:], descriptors[n])                        
+        globd1 = sum(eatom1, dims=1)
+    end
+    if (descriptors[n].name == "POD") & (descriptors[n].nbody==4) 
+        eatom1 = fourbodyeatom(x, t, a[:], b[:], c[:], pbc[:], descriptors[n])                        
+        globd1 = sum(eatom1, dims=1)
+    end
+    if (n==1)
+        globd = 1.0*globd1
+    else
+        globd = cat(globd, globd1, dims=2)
+    end
+end
+
+globd = globd[:]
+
+return globd
+    
+end
+    
+function podeatom(x, t, a, b, c, pbc, descriptors)
+
+for n = 1:length(descriptors)
+    if (descriptors[n].name == "POD") & (descriptors[n].nbody==1) 
+        eatom1, fatom1 = onebodyefatom(x, t, a[:], b[:], c[:], pbc[:], descriptors[n])                                        
+        globd1 = sum(eatom1, dims=1)            
+    end    
+    if (descriptors[n].name == "POD") & (descriptors[n].nbody==2) 
+        eatom1 = twobodyeatom(x, t, a[:], b[:], c[:], pbc[:], descriptors[n])                            
+        globd1 = sum(eatom1, dims=1)
+    end
+    if (descriptors[n].name == "POD") & (descriptors[n].nbody==3) 
+        eatom1 = threebodyeatom(x, t, a[:], b[:], c[:], pbc[:], descriptors[n])                        
+        globd1 = sum(eatom1, dims=1)
+    end
+    if (descriptors[n].name == "POD") & (descriptors[n].nbody==4) 
+        eatom1 = fourbodyeatom(x, t, a[:], b[:], c[:], pbc[:], descriptors[n])                        
+        globd1 = sum(eatom1, dims=1)
+    end
+    if (n==1)
+        globd = 1.0*globd1
+        eatom = 1.0*eatom1 
+    else
+        globd = cat(globd, globd1, dims=2)
+        eatom = cat(eatom, eatom1, dims=2)
+    end
+end
+
+globd = globd[:]
+eatom = eatom 
+
+return globd, eatom 
+    
+end
+   
+
 function podefatom(x, t, a, b, c, pbc, descriptors)
 
-nbd1 = 0; nbd2 = 0; nbd3 = 0    
-eatom1 = 0.0; eatom2 = 0.0; eatom3 = 0.0
-fatom1 = 0.0; fatom2 = 0.0; fatom3 = 0.0; fatom23 = 0.0
-globd1 = 0.0; globd2 = 0.0; globd3 = 0.0; globd23 = 0.0
+nbd1 = 0; nbd2 = 0; nbd3 = 0; nbd4=0;    
+eatom1 = 0.0; eatom2 = 0.0; eatom3 = 0.0; eatom4 = 0.0;
+fatom1 = 0.0; fatom2 = 0.0; fatom3 = 0.0; fatom4 = 0.0; fatom23 = 0.0
+globd1 = 0.0; globd2 = 0.0; globd3 = 0.0; globd4 = 0.0; globd23 = 0.0
 hybrid23 = false 
 for n = 1:length(descriptors)
     if (descriptors[n].name == "POD") & (descriptors[n].nbody==1) 
@@ -1478,35 +1832,63 @@ for n = 1:length(descriptors)
         nbd3 = 1
         hybrid23 = descriptors[n].hybrid23
     end
+    if (descriptors[n].name == "POD") & (descriptors[n].nbody==4) 
+        eatom4, fatom4 = fourbodyefatom(x, t, a[:], b[:], c[:], pbc[:], descriptors[n])                
+        globd4 = sum(eatom4, dims=1)
+        nbd4 = 1        
+    end
 end    
 
-if (nbd1 == 1) & (nbd2==1) & (nbd3==1)
+# if (nbd1 == 1) & (nbd2==1) & (nbd3==1)
+#     globd = cat(globd1, globd2, dims=2)
+#     globd = cat(globd, globd3, dims=2)
+#     fatom = cat(fatom1, fatom2, dims=2)
+#     fatom = cat(fatom, fatom3, dims=2)
+#     eatom = cat(eatom1, eatom2, dims=2)
+#     eatom = cat(eatom, eatom3, dims=2)
+# elseif (nbd2==1) & (nbd3==1)
+#     globd = cat(globd2, globd3, dims=2)
+#     fatom = cat(fatom2, fatom3, dims=2)
+#     eatom = cat(eatom2, eatom3, dims=2)
+# elseif (nbd2==1) & (nbd1==1)
+#     globd = cat(globd1, globd2, dims=2)
+#     fatom = cat(fatom1, fatom2, dims=2)
+#     eatom = cat(eatom1, eatom2, dims=2)
+# elseif (nbd2==1) & (nbd3==1)
+#     globd = cat(globd2, globd3, dims=2)
+#     fatom = cat(fatom2, fatom3, dims=2)
+#     eatom = cat(eatom2, eatom3, dims=2)
+# elseif (nbd2==1) 
+#     globd = 1.0*globd2         
+#     fatom = 1.0*fatom2         
+#     eatom = 1.0*eatom2         
+# elseif (nbd3==1) 
+#     globd = 1.0*globd3         
+#     fatom = 1.0*fatom3         
+#     eatom = 1.0*eatom3             
+# end
+
+if (nbd2==1) & (nbd1==1)
     globd = cat(globd1, globd2, dims=2)
-    globd = cat(globd, globd3, dims=2)
-    fatom = cat(fatom1, fatom2, dims=2)
-    fatom = cat(fatom, fatom3, dims=2)
-    eatom = cat(eatom1, eatom2, dims=2)
-    eatom = cat(eatom, eatom3, dims=2)
-elseif (nbd2==1) & (nbd3==1)
-    globd = cat(globd2, globd3, dims=2)
-    fatom = cat(fatom2, fatom3, dims=2)
-    eatom = cat(eatom2, eatom3, dims=2)
-elseif (nbd2==1) & (nbd1==1)
-    globd = cat(globd1, globd2, dims=2)
     fatom = cat(fatom1, fatom2, dims=2)
     eatom = cat(eatom1, eatom2, dims=2)
-elseif (nbd2==1) & (nbd3==1)
-    globd = cat(globd2, globd3, dims=2)
-    fatom = cat(fatom2, fatom3, dims=2)
-    eatom = cat(eatom2, eatom3, dims=2)
 elseif (nbd2==1) 
     globd = 1.0*globd2         
     fatom = 1.0*fatom2         
     eatom = 1.0*eatom2         
-elseif (nbd3==1) 
-    globd = 1.0*globd3         
-    fatom = 1.0*fatom3         
-    eatom = 1.0*eatom3             
+else
+    error("Two-body POD descriptors are required.")
+end
+
+if (nbd3 == 1)
+    globd = cat(globd, globd3, dims=2)
+    fatom = cat(fatom, fatom3, dims=2)
+    eatom = cat(eatom, eatom3, dims=2)
+end
+if (nbd4 == 1)
+    globd = cat(globd, globd4, dims=2)
+    fatom = cat(fatom, fatom4, dims=2)
+    eatom = cat(eatom, eatom4, dims=2)
 end
 
 # if (nbd2==1) & (nbd3==1) & (hybrid23)
@@ -1519,19 +1901,126 @@ end
 #     podhybrid23(globd23, fatom23, globd2, globd3, fatom2, fatom3, Int32(M2), Int32(M3), Int32(dim*N))
 # end           
 
-if (nbd2==1) & (nbd3==1) & (hybrid23)
+dim, N = size(x)
+n2 = 0
+n3 = 0
+n4 = 0
+if (nbd2==1) 
     for n = 1:length(descriptors)
         if (descriptors[n].name == "POD") & (descriptors[n].nbody==2) 
-            globd2 = globd2*descriptors[n].U 
-            fatom2 = fatom2*descriptors[n].U             
-        end
-        if (descriptors[n].name == "POD") & (descriptors[n].nbody==3) 
-            globd3 = globd3*descriptors[n].U 
-            fatom3 = fatom3*descriptors[n].U             
+            if (length(descriptors[n].U)>1)
+                globd2 = globd2*descriptors[n].U 
+                fatom2 = fatom2*descriptors[n].U             
+            else
+                N3 = size(fatom2,1)                
+                nrbf = size(descriptors[n].Phi,2)
+                M2 = min(nrbf, 7)
+                S = length(descriptors[n].species)
+                S2 = Int32(S*(S+1)/2)
+                globd2 = reshape(globd2,(nrbf, S2))
+                fatom2 = reshape(fatom2,(N3, nrbf, S2))                
+                globd2 = reshape(globd2[1:M2,:], (1, M2*S2))
+                fatom2 = reshape(fatom2[:,1:M2,:], (N3, M2*S2))
+            end
+            n2 = n;
+            break; 
         end
     end
+end
+if (nbd3==1) 
+    for n = 1:length(descriptors)
+        if (descriptors[n].name == "POD") & (descriptors[n].nbody==3)  
+            if (length(descriptors[n].U)>1)
+                globd3 = globd3*descriptors[n].U 
+                fatom3 = fatom3*descriptors[n].U          
+            else
+                nrbf = size(descriptors[n].Phi,2)
+                nabf = descriptors[n].pdegree[3]       
+                M = nrbf*(nabf+1)  
+                N3 = size(fatom2,1)                
+                M3 = min(nrbf, 7)*(min(nabf, 4) + 1)                
+                S = length(descriptors[n].species)
+                S3 = Int32(S*S*(S+1)/2)
+                globd3 = reshape(globd3,(M, S3))
+                fatom3 = reshape(fatom3,(N3, M, S3))                
+                globd3 = reshape(globd3[1:M3,:], (1, M3*S3))
+                fatom3 = reshape(fatom3[:,1:M3,:], (N3, M3*S3))
+            end
+            n3 = n;
+            break;    
+        end
+    end
+end
+if (nbd4==1) 
+    for n = 1:length(descriptors)
+        if (descriptors[n].name == "POD") & (descriptors[n].nbody==4)  
+            if (length(descriptors[n].U)>1)
+                globd4 = globd4*descriptors[n].U 
+                fatom4 = fatom4*descriptors[n].U          
+            end
+            n4 = n;
+            break;    
+        end
+    end
+end
 
-    dim, N = size(x)
+M2 = descriptors[n2].b2b2
+if (nbd2==1) & (M2 > 0)    
+    globd22 = zeros(1,M2*M2)
+    fatom22 = zeros(dim*N, M2*M2)    
+    podhybrid23(globd22, fatom22, globd2, globd2, fatom2, fatom2, Int32(M2), Int32(M2), Int32(dim*N))
+    globd = cat(globd, globd22, dims=2)    
+    fatom = cat(fatom, fatom22, dims=2)
+end
+
+if (nbd3==1) 
+    M3 = descriptors[n3].b3b3
+    if (M3 > 0)    
+    globd33 = zeros(1,M3*M3)
+    fatom33 = zeros(dim*N, M3*M3)    
+    podhybrid23(globd33, fatom33, globd3, globd3, fatom3, fatom3, Int32(M3), Int32(M3), Int32(dim*N))
+    globd = cat(globd, globd33, dims=2)    
+    fatom = cat(fatom, fatom33, dims=2)
+    end
+end
+
+if (nbd2==1) & (nbd3==1) 
+    M2 = descriptors[n2].b2b3
+    M3 = descriptors[n3].b2b3
+    if (M2 > 0) & (M3 > 0)
+    globd23 = zeros(1,M2*M3)
+    fatom23 = zeros(dim*N, M2*M3)    
+    podhybrid23(globd23, fatom23, globd2, globd3, fatom2, fatom3, Int32(M2), Int32(M3), Int32(dim*N))
+    globd = cat(globd, globd23, dims=2)    
+    fatom = cat(fatom, fatom23, dims=2)
+    end
+end
+
+if (nbd2==1) & (nbd4==1) 
+    M2 = descriptors[n2].b2b4
+    M4 = descriptors[n4].b2b4
+    if (M2 > 0) & (M4 > 0)
+    globd24 = zeros(1,M2*M4)
+    fatom24 = zeros(dim*N, M2*M4)    
+    podhybrid23(globd24, fatom24, globd2, globd4, fatom2, fatom4, Int32(M2), Int32(M4), Int32(dim*N))
+    globd = cat(globd, globd24, dims=2)    
+    fatom = cat(fatom, fatom24, dims=2)
+    end
+end
+
+if (nbd3==1) & (nbd4==1) 
+    M3 = descriptors[n3].b3b4
+    M4 = descriptors[n4].b3b4
+    if (M3 > 0) & (M4 > 0)
+    globd34 = zeros(1,M3*M4)
+    fatom34 = zeros(dim*N, M3*M4)    
+    podhybrid23(globd34, fatom34, globd3, globd4, fatom3, fatom4, Int32(M3), Int32(M4), Int32(dim*N))
+    globd = cat(globd, globd34, dims=2)    
+    fatom = cat(fatom, fatom34, dims=2)
+    end
+end
+
+if (nbd2==1) & (nbd3==1) & (hybrid23)
     M2 = length(globd2)
     M3 = length(globd3)
     
@@ -1706,16 +2195,20 @@ function poderroranalysis(data, descriptors, Doptions, coeff)
     eerr = Array{Any}(nothing, n)
     ferr = Array{Any}(nothing, n)
     ferm = Array{Any}(nothing, n)
+    
     for i = 1:n
         if typeof(data[i]) == Preprocessing.DataStruct
             config, ~ = Preprocessing.readconfigdata(data[i], pbc, a, b, c)                  
         else
             config = data[i]
         end
+        
+        #ntest = config.nconfigs
+        #println("Number of test configurations for " * data[i].datapath * " : $ntest")                      
 
         e1, e2, e3, e4, e5, e6, e7, nconfigs, nforces, energy = 
                 poderrors(config, descriptors, coeff, normalizeenergy)        
-
+        
         energies[i] = energy   
         eerr[i] = e1
         ferr[i] = e4 

@@ -102,9 +102,6 @@ Preprocessing.mkfolder("results")
 writedlm("results/fitpodcoeff" * string(j) *  ".txt", coeff)
 writedlm("results/fitpodtrainerror" * string(j) *  ".txt", [energyerrors forceerrors])    
 
-ind = findall(ferr[1][:] .> 1.5);
-lattice = config.lattice[:,ind];
-outlat = unique(lattice,dims=2);
-
-
-
+# ind = findall(ferr[1][:] .> 1.5);
+# lattice = config.lattice[:,ind];
+# outlat = unique(lattice,dims=2);

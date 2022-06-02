@@ -56,6 +56,7 @@ include("writeEXTXYZ.jl");
 include("readJSON.jl");
 include("readJSONpymatgen.jl");
 include("readJSONfromFolder.jl");
+include("readANN.jl");
 include("readweight.jl");
 include("datastruct.jl");
 include("writeapp.jl");

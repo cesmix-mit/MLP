@@ -2,6 +2,7 @@ cdir = pwd(); ii = findlast("MLP", cdir); MLPpath = cdir[1:ii[end]] * "/";
 include(MLPpath * "src/setup.jl");
 
 using DelimitedFiles
+using ACEpot
 
 # path to the database 
 datapath = "../../data/"
@@ -21,8 +22,8 @@ weightouter = [0.8, 0.2, 0.0]
 # randomly selecting the configurations in the database
 randomize = false;
 
-# use all the data 
-percentage = 100.0;
+# use 20% the data 
+percentage = 20.0;
 
 # translate atom positions 
 translationvector = nothing
@@ -35,6 +36,13 @@ transposelattice = false
 
 # training data 
 traindata[1] = adddata(datapath * folders[1], dataformat, fileextension, 
+            percentage, randomize, atomspecies, weightinner[1,:], translationvector, 
+            rotationmatrix, transposelattice)
+
+# randomly selecting the configurations in the database
+randomize = true;
+# test data 
+testdata[1] = adddata(datapath * folders[1], dataformat, fileextension, 
             percentage, randomize, atomspecies, weightinner[1,:], translationvector, 
             rotationmatrix, transposelattice)
 
@@ -58,20 +66,25 @@ for j = 0:4
     local acedescriptors = Array{Any}(nothing, 3)
     # ACE descriptors
     if j == 0
-        acedescriptors[1] = ACEpot.ACEparams(species = [:Ga,:N], nbody=3, pdegree=6, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=2.0, csp=1.75)
+        acedescriptors[1] = ACEpot.ACEparams(species = [:Ti,:O], nbody=1, pdegree=6, r0=ACEpot.rnn(:Ti), rcut=rcut, rin=rin, wL=2.0, csp=1.75)
+        acedescriptors[2] = ACEpot.ACEparams(species = [:Ga,:N], nbody=3, pdegree=6, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=2.0, csp=1.75)
     elseif j == 1
-        acedescriptors[1] = ACEpot.ACEparams(species = [:Ga,:N], nbody=4, pdegree=8, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=1.75, csp=1.5)
+        acedescriptors[1] = ACEpot.ACEparams(species = [:Ti,:O], nbody=1, pdegree=6, r0=ACEpot.rnn(:Ti), rcut=rcut, rin=rin, wL=2.0, csp=1.75)
+        acedescriptors[2] = ACEpot.ACEparams(species = [:Ga,:N], nbody=4, pdegree=8, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=1.75, csp=1.5)
     elseif j==2
-        acedescriptors[1] = ACEpot.ACEparams(species = [:Ga,:N], nbody=2, pdegree=3, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=1.5, csp=1.5)
+        acedescriptors[1] = ACEpot.ACEparams(species = [:Ti,:O], nbody=1, pdegree=6, r0=ACEpot.rnn(:Ti), rcut=rcut, rin=rin, wL=2.0, csp=1.75)
+        acedescriptors[2] = ACEpot.ACEparams(species = [:Ga,:N], nbody=2, pdegree=3, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=1.5, csp=1.5)
         #acedescriptors[1] = ACEpot.ACEparams(species = [:Ga,:N], nbody=3, pdegree=4, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=2.0, csp=1.75)
-        acedescriptors[2] = ACEpot.ACEparams(species = [:Ga,:N], nbody=4, pdegree=10, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=1.25, csp=1.5)
+        acedescriptors[3] = ACEpot.ACEparams(species = [:Ga,:N], nbody=4, pdegree=10, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=1.25, csp=1.5)
     elseif j==3 
-        acedescriptors[1] = ACEpot.ACEparams(species = [:Ga,:N], nbody=2, pdegree=3, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=1.5, csp=1.5)
+        acedescriptors[1] = ACEpot.ACEparams(species = [:Ti,:O], nbody=1, pdegree=6, r0=ACEpot.rnn(:Ti), rcut=rcut, rin=rin, wL=2.0, csp=1.75)
+        acedescriptors[2] = ACEpot.ACEparams(species = [:Ga,:N], nbody=2, pdegree=3, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=1.5, csp=1.5)
         #acedescriptors[1] = ACEpot.ACEparams(species = [:Ga,:N], nbody=3, pdegree=4, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=2.0, csp=1.75)
-        acedescriptors[2] = ACEpot.ACEparams(species = [:Ga,:N], nbody=4, pdegree=12, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=1.5, csp=1.5)
+        acedescriptors[3] = ACEpot.ACEparams(species = [:Ga,:N], nbody=4, pdegree=12, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=1.5, csp=1.5)
     elseif j==4
-        acedescriptors[1] = ACEpot.ACEparams(species = [:Ga,:N], nbody=2, pdegree=12, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=1.5, csp=1.5)
-        acedescriptors[2] = ACEpot.ACEparams(species = [:Ga,:N], nbody=4, pdegree=12, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=1.35, csp=1.25)
+        acedescriptors[1] = ACEpot.ACEparams(species = [:Ti,:O], nbody=1, pdegree=6, r0=ACEpot.rnn(:Ti), rcut=rcut, rin=rin, wL=2.0, csp=1.75)
+        acedescriptors[2] = ACEpot.ACEparams(species = [:Ga,:N], nbody=2, pdegree=12, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=1.5, csp=1.5)
+        acedescriptors[3] = ACEpot.ACEparams(species = [:Ga,:N], nbody=4, pdegree=12, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=1.35, csp=1.25)
     elseif j==5           
         acedescriptors[1] = ACEpot.ACEparams(species = [:Ga,:N], nbody=4, pdegree=13, r0=ACEpot.rnn(:Be), rcut=rcut, rin=rin, wL=1.15, csp=1.25)
     end
@@ -84,8 +97,16 @@ for j = 0:4
     printerrors(["train"], e1, "Energy Errors")
     printerrors(["train"], e2, "Force Errors")
 
+    energytesterrors, forcetesterrors = Potential.aceerroranalysis(testdata, acedescriptors, Doptions, coeff)
+
+    e1 = [energytesterrors[:,1] energytesterrors[:,2] 0*energytesterrors[:,1]]
+    e2 = [forcetesterrors[:,1] forcetesterrors[:,2] 0*forcetesterrors[:,1]]
+    printerrors(["test"], e1, "Energy Errors")
+    printerrors(["test"], e2, "Force Errors")
+
     Preprocessing.mkfolder("results")
     writedlm("results/fitacecoeff" * string(j) *  ".txt", coeff)
     writedlm("results/fitacetrainerror" * string(j) *  ".txt", [energyerrors forceerrors])    
+    writedlm("results/fitacetesterror" * string(j) *  ".txt", [energytesterrors forcetesterrors])    
 end
 

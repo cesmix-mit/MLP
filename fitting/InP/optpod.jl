@@ -61,7 +61,7 @@ rcut = 5.0
 rin = 0.9
 
 # bounds for cut-off radius to be optimized
-rcutrange = [4.25, 5.0]
+rcutrange = [3.8, 5.0]
 
 # bounds for inner radius to be optimized
 rinrange = [0.3, 1.5]
@@ -80,7 +80,7 @@ optim = setoptim(lossfunc, method, eta, kappa, weightouter, etaspace)
 
 # Bessel scaling parameters
 gamma = [0.0, 2, 4]
-for j = 1:1
+for j = 0:0
 
     display(j)
 

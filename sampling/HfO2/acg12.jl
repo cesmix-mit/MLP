@@ -1,0 +1,78 @@
+cdir = pwd(); ii = findlast("MLP", cdir); MLPpath = cdir[1:ii[end]] * "/";    
+include(MLPpath * "src/setup.jl");
+
+using DelimitedFiles
+using ACG, Potential
+
+species = ["Hf", "O"];
+a = 5.14231900;
+b = 5.19514800;
+c = 5.32603846;
+alpha = 90.0;
+beta = 99.67452930;
+gamma = 90.0;
+atomtype = [1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2];
+fraccoords = [0.724041 0.457319 0.292109
+0.275959 0.957319 0.207891
+0.275959 0.542681 0.707891
+0.724041 0.042681 0.792109
+0.551113 0.742603 0.022292 
+0.448887 0.242603 0.477708 
+0.448887 0.257397 0.977708 
+0.551113 0.757397 0.522292 
+0.932151 0.330122 0.652906 
+0.067849 0.830122 0.847094 
+0.067849 0.669878 0.347094 
+0.932151 0.169878 0.152906]';
+
+lat = ACG.setlatticefraction(a, b, c, alpha, beta, gamma, fraccoords, atomtype);
+
+rin = 0.5
+rcut = 5.0
+gamma = [0.0, 2, 4]
+descriptors[1] = POD(nbody=1, species = [:Hf,:O], pdegree=[0], nbasis = [1], rin = rin, rcut=rcut)
+descriptors[2] = POD(nbody=2, species = [:Hf,:O], pdegree=[3,6], nbasis = [6], rin = rin, rcut=rcut, gamma0 = gamma)
+descriptors[3] = POD(nbody=3, species = [:Hf,:O], pdegree=[3,6,4], nbasis = [5, 4], rin = rin, rcut=rcut, gamma0 = gamma)
+descriptors = Preprocessing.deletenothing(descriptors);
+
+pranges = [a-1.0 a+1.0; b-1.0 b+1.0; c-1.0 c+1.0];        
+pdims = [23, 23, 23];        
+plattices, patombases = ACG.lengthconfigurations(lat, pranges, pdims, descriptors, 1500);
+
+aranges = [75 105; 90 110; 75 105];        
+adims = [23, 23, 23];        
+alattices, aatombases = ACG.angleconfigurations(lat, aranges, adims, descriptors, 1500);
+
+lranges = [a-1.0 a+1.0; b-1.0 b+1.0; c-1.0 c+1.0; 75 105; 90 110; 75 105];        
+ldims = [6, 6, 6, 4, 4, 4];        
+llattices, latombases = ACG.latticeconfigurations(lat, lranges, ldims, descriptors, 1500);
+
+la = [plattices[:,:,1] alattices[:,:,1] llattices[:,:,1]]
+ba = cat(patombases, aatombases, dims=3)
+ba = cat(ba, latombases, dims=3)
+dlattices, datombases = ACG.selectconfigurations(la[1:3,:], la[4:6,:], la[7:9,:], ba[:,:,:,1], atomtype, descriptors, 1e-6);
+
+natom = length(atomtype);
+ds = 0.05*ones(natom);        
+N = 12000;    
+blattices, batombases = ACG.atomdisplacementconfigurations(lat, ds, N, descriptors, 1e-5);
+n = size(batombases,3)
+blattices = blattices .* ones(9, n)
+
+lattices = [dlattices[:,:,1] blattices[:,:,1]]
+atombases = cat(datombases, batombases, dims=3)
+n = size(lattices, 2);
+natoms = natom*ones(Int64, n);
+lattices = reshape(lattices, (9, n))
+atombases = reshape(atombases, (3, natom*n));
+atomtypes = atomtype[:] .* ones(Int64, (1, n)); 
+atomtypes = reshape(atomtypes, (1, natom*n))
+
+ind = findall(abs.(lattices[:]) .< 1e-12);
+lattices[ind] .= 0.0;
+ind = findall(abs.(atombases[:]) .< 1e-12);
+atombases[ind] .= 0.0;
+
+ACG.writeEXTXYZ2("HfO2sg14n12.xyz", species, natoms, lattices, atomtypes, atombases);
+
+

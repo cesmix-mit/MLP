@@ -441,9 +441,9 @@ function linearfit(traindata, descriptors, Doptions)
     end
 
     if pod==1
-        @time begin
-        descriptors = Potential.podprojection(trainconfig, descriptors, Doptions.pbc, Doptions.a, Doptions.b, Doptions.c)
-        end
+        # @time begin
+        # descriptors = Potential.podprojection(trainconfig, descriptors, Doptions.pbc, Doptions.a, Doptions.b, Doptions.c)
+        # end
         @time begin
         coeff,~ = Potential.podleastsq(trainconfig, descriptors, Doptions)
         end
@@ -758,9 +758,9 @@ function maespace(traindata, validdata, descriptors, potential, Doptions, optim:
         optim.eta[1:meta] = eta[n,:]
         descriptors = setcutoff(descriptors, optim.eta)      
         if pod==1
-            @time begin
-            descriptors = Potential.podprojection(trainconfig, descriptors, Doptions.pbc, Doptions.a, Doptions.b, Doptions.c)
-            end
+            # @time begin
+            # descriptors = Potential.podprojection(trainconfig, descriptors, Doptions.pbc, Doptions.a, Doptions.b, Doptions.c)
+            # end
             @time begin
             coeff,~ = Potential.podleastsq(trainconfig, descriptors, Doptions)
             end
@@ -948,7 +948,7 @@ function optimize(traindata, testdata, descriptors, potential, Doptions, optim::
     # compute coefficient 
     #coeff,~ = linearfit(traindata, descriptors, potential, Doptions, optim)    
     if pod==1
-        descriptors = Potential.podprojection(trainconfig, descriptors, Doptions.pbc, Doptions.a, Doptions.b, Doptions.c)
+        #descriptors = Potential.podprojection(trainconfig, descriptors, Doptions.pbc, Doptions.a, Doptions.b, Doptions.c)
         coeff,~ = Potential.podleastsq(trainconfig, descriptors, Doptions)
         eerr, ferr, serr = Potential.poderroranalysis(trainconfig, descriptors, Doptions, coeff)
     elseif ace==1

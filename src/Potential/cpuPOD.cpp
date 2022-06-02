@@ -262,6 +262,85 @@ void bispectrumderiv(double *dbsa, double *Ar, double *Ai, double *dAr, double *
     }
 }
 
+void bispectrumderiv2(double *dbsa, double *Ar, double *Ai, double *dAr, double *dAi, double *cg, 
+    int *pairnum, int *indl, int *indm, int *rowm, int *tj, int K, int J, int Q, int S, int M, int N, int Nij)
+{
+    for (int k=0; k<K; k++) {
+        double *pAr = &Ar[N*M*S*k];
+        double *pAi = &Ai[N*M*S*k];
+        for (int j=0; j<J; j++) {
+            int l2 = indl[j + 0*J];
+            int l1 = indl[j + 1*J];
+            int l  = indl[j + 2*J];                                     
+            int nm = rowm[j+1]-rowm[j];       
+            double *pdb = &dbsa[3*Nij*(j + J*k)];
+            for (int i=0; i<nm; i++) {
+                int q = rowm[j]+i;
+                double c = cg[q];
+                int m2 = indm[q + 0*Q];
+                int m1 = indm[q + 1*Q];
+                int m  = indm[q + 2*Q];
+                int ml = m + l + (l*l);          
+                int ml1 = m1 + l1 + (l1*l1);
+                int ml2 = m2 + l2 + (l2*l2);
+                double *pdA1 = &dAr[3*Nij*(ml + M*k)];
+                double *pdA2 = &dAr[3*Nij*(ml1 + M*k)];
+                double *pdA3 = &dAr[3*Nij*(ml2 + M*k)];
+                double *pdA4 = &dAi[3*Nij*(ml + M*k)];                     
+                double *pdA5 = &dAi[3*Nij*(ml1 + M*k)];                     
+                double *pdA6 = &dAi[3*Nij*(ml2 + M*k)]; 
+                for (int n=0; n<N; n++)  {
+                    int n0 = pairnum[n];
+                    int nj = pairnum[n+1]-n0;
+
+                    for (int sj=0; sj<S; sj++) {
+                        double a1 = pAr[n + N*ml + N*M*sj];
+                        double b1 = pAi[n + N*ml + N*M*sj];
+                        double a2 = pAr[n + N*ml1 + N*M*sj];
+                        double b2 = pAi[n + N*ml1 + N*M*sj];
+                        double a3 = pAr[n + N*ml2 + N*M*sj];
+                        double b3 = pAi[n + N*ml2 + N*M*sj];
+
+                        double a2a3 = a2*a3;
+                        double a1a3 = a1*a3;
+                        double a1a2 = a1*a2;
+                        double b1b2 = b1*b2;
+                        double b1b3 = b1*b3;
+                        double b2b3 = b2*b3;
+                        double a1b2 = a1*b2;
+                        double a1b3 = a1*b3;
+                        double a2b3 = a2*b3;
+                        double a2b1 = a2*b1;
+                        double a3b1 = a3*b1;
+                        double a3b2 = a3*b2;
+
+                        double c1 = c*(a2a3-b2b3);
+                        double c2 = c*(a1a3+b1b3);
+                        double c3 = c*(a1a2+b1b2);
+                        double c4 = c*(a2b3+a3b2);
+                        double c5 = c*(a3b1-a1b3);
+                        double c6 = c*(a2b1-a1b2);
+                        
+                        for (int ij=0; ij<nj; ij++) {                        
+                            int n1 = n0 + ij;     
+                            if (tj[n1] == sj) {
+                                int d = 0 + 3*n1; 
+                                pdb[d] += pdA1[d]*c1 + pdA2[d]*c2 + pdA3[d]*c3 + pdA4[d]*c4 + pdA5[d]*c5 + pdA6[d]*c6;       
+
+                                d = 1 + 3*n1; 
+                                pdb[d] += pdA1[d]*c1 + pdA2[d]*c2 + pdA3[d]*c3 + pdA4[d]*c4 + pdA5[d]*c5 + pdA6[d]*c6;       
+
+                                d = 2 + 3*n1;                  
+                                pdb[d] += pdA1[d]*c1 + pdA2[d]*c2 + pdA3[d]*c3 + pdA4[d]*c4 + pdA5[d]*c5 + pdA6[d]*c6;       
+                            }
+                        }
+                    }
+                }                                
+            }
+        }
+    }
+}
+
 void makeindjk(int *indj, int *indk, int n)
 {    
     int k1 = 1;
