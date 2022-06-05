@@ -15,8 +15,8 @@ function loadsnap(mdppath::String)
         libpath = mdppath * "src/Potential/cpuSnap.dylib";
     elseif Sys.isunix()
         libpath = mdppath * "src/Potential/cpuSnap.so";
-    elseif Sys.windows()
-        libpath = mdppath * "src/Potential/cpuSnap.so";
+    elseif Sys.iswindows()
+        libpath = mdppath * "src/Potential/cpuSnap.dll";
     end
     if isfile(libpath)
         libexist = 1;
@@ -28,8 +28,10 @@ function loadsnap(mdppath::String)
         run(cstr)
         if Sys.isapple()            
             cstr = `g++ -shared cpusnap.o -o cpuSnap.dylib`            
-        else
-            cstr = `g++ -shared cpusnap.o -o cpuSnap.so`            
+        elseif Sys.isunix()
+            cstr = `g++ -shared cpusnap.o -o cpuSnap.so`     
+        elseif Sys.iswindows()
+            cstr = `g++ -shared cpusnap.o -o cpuSnap.dll`     
         end 
         run(cstr)
         cd(cdir)                   

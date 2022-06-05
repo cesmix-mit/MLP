@@ -15,7 +15,7 @@ function loadpod(mdppath::String)
         libpath = mdppath * "src/Potential/cpuPOD.dylib";
     elseif Sys.isunix()
         libpath = mdppath * "src/Potential/cpuPOD.so";
-    elseif Sys.windows()
+    elseif Sys.iswindows()
         libpath = mdppath * "src/Potential/cpuPOD.so";
     end
     if isfile(libpath)

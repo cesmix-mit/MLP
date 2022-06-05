@@ -96,8 +96,8 @@ function printlatextable(f, a::Matrix{Float64}, d)
             end
         end
     end
+    return s
 end
-
 
 function printlatextable(a::Matrix{Float64}, d)
 
