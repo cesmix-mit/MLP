@@ -16,7 +16,7 @@ function loadpod(mdppath::String)
     elseif Sys.isunix()
         libpath = mdppath * "src/Potential/cpuPOD.so";
     elseif Sys.iswindows()
-        libpath = mdppath * "src/Potential/cpuPOD.so";
+        libpath = mdppath * "src/Potential/cpuPOD.dll";
     end
     if isfile(libpath)
         libexist = 1;
@@ -28,8 +28,10 @@ function loadpod(mdppath::String)
         run(cstr)
         if Sys.isapple()            
             cstr = `g++ -shared cpuPOD.o -o cpuPOD.dylib`            
-        else
-            cstr = `g++ -shared cpuPOD.o -o cpuPOD.so`            
+        elseif Sys.isunix()
+            cstr = `g++ -shared cpuPOD.o -o cpuPOD.so`      
+        elseif Sys.iswindows()
+            cstr = `g++ -shared cpuPOD.o -o cpuPOD.dll`    
         end 
         run(cstr)
         cd(cdir)                   

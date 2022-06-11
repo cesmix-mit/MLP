@@ -997,6 +997,7 @@ function snaperrors(config, descriptors, coeff, normalizeenergy)
     nconfigs = length(config.natom)
     natom = [0; cumsum(config.natom[:])];
     
+    DFTenergy = zeros(nconfigs)
     energy = zeros(nconfigs)
     eerr = zeros(nconfigs)
     fmae = zeros(nconfigs)
@@ -1013,6 +1014,7 @@ function snaperrors(config, descriptors, coeff, normalizeenergy)
         e1 = globd*coeff;
         f1 = fatom*coeff;
 
+        DFTenergy[i] = e*normconst      
         energy[i] = e1[1]*normconst        
         eerr[i] = abs(e1[1] - e)*normconst         
 
@@ -1034,7 +1036,7 @@ function snaperrors(config, descriptors, coeff, normalizeenergy)
     fmaeave = sum(fmae.*szbf)/nforces
     frmseave =  sqrt(sum((frmse.^2).*szbf)/nforces)    
 
-    return eerr, emae, ermse, fmae, frmse, fmaeave, frmseave, nconfigs, nforces, energy 
+    return eerr, emae, ermse, fmae, frmse, fmaeave, frmseave, nconfigs, nforces, energy, DFTenergy
 end
         
 function snaperroranalysis(data, descriptors, Doptions, coeff)
@@ -1065,6 +1067,7 @@ function snaperroranalysis(data, descriptors, Doptions, coeff)
     frmse = -ones(Float64,n)
     szbe = zeros(Int64, n)
     szbf = zeros(Int64, n)
+    DFTenergies = Array{Any}(nothing, n)
     energies = Array{Any}(nothing, n)
     eerr = Array{Any}(nothing, n)
     ferr = Array{Any}(nothing, n)
@@ -1076,9 +1079,10 @@ function snaperroranalysis(data, descriptors, Doptions, coeff)
             config = data[i]
         end
 
-        e1, e2, e3, e4, e5, e6, e7, nconfigs, nforces, energy = 
+        e1, e2, e3, e4, e5, e6, e7, nconfigs, nforces, energy, DFTenergy = 
                 snaperrors(config, descriptors, coeff, normalizeenergy)        
 
+        DFTenergies[i] = DFTenergy                 
         energies[i] = energy                 
         eerr[i] = e1
         ferr[i] = e4 
@@ -1104,7 +1108,7 @@ function snaperroranalysis(data, descriptors, Doptions, coeff)
     forceerrors[1,2] =  sqrt(sum((frmse.^2).*szbf)/sum(szbf))    
     forceerrors[2:end,:] = [fmae frmse]   
 
-    return energyerrors, forceerrors, stresserrors, eerr, ferr, ferm, energies  
+    return energyerrors, forceerrors, stresserrors, eerr, ferr, ferm, energies, DFTenergies  
 end
     
     

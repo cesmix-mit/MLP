@@ -1621,7 +1621,7 @@ function podprojection(data, descriptors, pbc=nothing, a=nothing, b=nothing, c=n
         B2 = (1.0/K2)*B2    
         U2, s2 = eigenvalues(B2)
         n2 = numbasis(s2, projectiontol);
-        U2 = U2[:,1:n2];
+        U2 = U2[:,1:n2];        
     end
 
     if K3 > 0
@@ -1808,6 +1808,8 @@ end
    
 
 function podefatom(x, t, a, b, c, pbc, descriptors)
+
+descriptors = deletenothing(descriptors)
 
 nbd1 = 0; nbd2 = 0; nbd3 = 0; nbd4=0;    
 eatom1 = 0.0; eatom2 = 0.0; eatom3 = 0.0; eatom4 = 0.0;
@@ -2028,8 +2030,10 @@ if (nbd2==1) & (nbd3==1) & (hybrid23)
     fatom23 = zeros(dim*N, M2*M3)    
     podhybrid23(globd23, fatom23, globd2, globd3, fatom2, fatom3, Int32(M2), Int32(M3), Int32(dim*N))
 
+    #display([M2 M3 length(globd)])
+
     globd = cat(globd, globd23, dims=2)    
-    fatom = cat(fatom, fatom23, dims=2)
+    fatom = cat(fatom, fatom23, dims=2)    
 end
 
 return globd, fatom, eatom 
@@ -2124,6 +2128,7 @@ function poderrors(config, descriptors, coeff, normalizeenergy)
     natom = [0; cumsum(config.natom[:])];
     
     energy = zeros(nconfigs)
+    DFTenergy = zeros(nconfigs)
     eerr = zeros(nconfigs)
     fmae = zeros(nconfigs)
     frmse = zeros(nconfigs)
@@ -2139,6 +2144,7 @@ function poderrors(config, descriptors, coeff, normalizeenergy)
         e1 = globd*coeff;
         f1 = fatom*coeff;
 
+        DFTenergy[i] = e*normconst
         energy[i] = e1[1]*normconst
         eerr[i] = abs(e1[1] - e)*normconst         
 
@@ -2149,6 +2155,26 @@ function poderrors(config, descriptors, coeff, normalizeenergy)
         ssr = sum(res.^2)
         mse = ssr /N;
         frmse[i] = sqrt(mse) 
+
+        # f1 = reshape(f1, (3, Int64(N/3)))
+        # df = f1 - f
+        # mf = df[1,:].^2 + df[2,:].^2 + df[3,:].^2        
+        # #ma, im = findmin(mf)        
+                 
+        # m0 = norm(f[:,im])
+        # m1 = norm(f1[:,im])
+        # m2 = dot(f[:,im], f1[:,im]) #f[1,im]*f1[1,im] + f[2,im]*f1[2,im] + f[3,im]*f1[3,im]        
+        # costhe = m2/(m0*m1);    
+        # if abs(costhe) > 1.0
+        #     costhe = 1.0*sign(costhe)
+        # end         
+        # theta = acos(costhe)*180.0/pi            
+        # display([m0 m1 theta])
+        # display([f[:,im] f1[:,im]])
+        # display(f)
+        # display(f1)
+        # display([eerr[i] fmae[i]])
+        #error("here")
     end
     
     emae = sum(abs.(eerr))/nconfigs
@@ -2160,7 +2186,7 @@ function poderrors(config, descriptors, coeff, normalizeenergy)
     fmaeave = sum(fmae.*szbf)/nforces
     frmseave =  sqrt(sum((frmse.^2).*szbf)/nforces)    
 
-    return eerr, emae, ermse, fmae, frmse, fmaeave, frmseave, nconfigs, nforces, energy
+    return eerr, emae, ermse, fmae, frmse, fmaeave, frmseave, nconfigs, nforces, energy, DFTenergy
 end
     
 function poderroranalysis(data, descriptors, Doptions, coeff)
@@ -2192,6 +2218,7 @@ function poderroranalysis(data, descriptors, Doptions, coeff)
     szbe = zeros(Int64, n)
     szbf = zeros(Int64, n)
     energies = Array{Any}(nothing, n)
+    DFTenergies = Array{Any}(nothing, n)
     eerr = Array{Any}(nothing, n)
     ferr = Array{Any}(nothing, n)
     ferm = Array{Any}(nothing, n)
@@ -2202,13 +2229,14 @@ function poderroranalysis(data, descriptors, Doptions, coeff)
         else
             config = data[i]
         end
-        
+
         #ntest = config.nconfigs
         #println("Number of test configurations for " * data[i].datapath * " : $ntest")                      
 
-        e1, e2, e3, e4, e5, e6, e7, nconfigs, nforces, energy = 
+        e1, e2, e3, e4, e5, e6, e7, nconfigs, nforces, energy, DFTenergy = 
                 poderrors(config, descriptors, coeff, normalizeenergy)        
         
+        DFTenergies[i] = DFTenergy   
         energies[i] = energy   
         eerr[i] = e1
         ferr[i] = e4 
@@ -2234,6 +2262,6 @@ function poderroranalysis(data, descriptors, Doptions, coeff)
     forceerrors[1,2] =  sqrt(sum((frmse.^2).*szbf)/sum(szbf))    
     forceerrors[2:end,:] = [fmae frmse]   
 
-    return energyerrors, forceerrors, stresserrors, eerr, ferr, ferm, energies  
+    return energyerrors, forceerrors, stresserrors, eerr, ferr, ferm, energies, DFTenergies  
 end
 

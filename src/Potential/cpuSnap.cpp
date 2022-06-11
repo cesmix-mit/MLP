@@ -12,6 +12,8 @@
 #ifndef CPUSNAP
 #define CPUSNAP
 
+#define _USE_MATH_DEFINES
+
 #include "cpuSnap.h"
 
 #include <stdio.h>

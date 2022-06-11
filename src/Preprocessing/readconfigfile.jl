@@ -214,7 +214,7 @@ function readconfigpath2(datapath, dataformat, fileextension, atomspecies, rando
         end
     end
     
-    return config, maxconfigs
+    return config, maxconfigs, files 
 end
 
 function readconfigdata(data, pbc=nothing, a=nothing, b=nothing, c=nothing)
@@ -222,7 +222,7 @@ function readconfigdata(data, pbc=nothing, a=nothing, b=nothing, c=nothing)
     datapath, dataformat, fileextension, percentage, randomize, atomspecies, 
             weight, translation, rotation, transposelattice  = getdata(data)
     
-    config, maxconfigs = readconfigpath2(datapath, dataformat, fileextension, atomspecies, randomize, percentage, transposelattice, pbc)
+    config, maxconfigs, files = readconfigpath2(datapath, dataformat, fileextension, atomspecies, randomize, percentage, transposelattice, pbc)
         
     if maxconfigs < 100
         config.nconfigs = length(config.natom)
@@ -264,7 +264,7 @@ function readconfigdata(data, pbc=nothing, a=nothing, b=nothing, c=nothing)
     end
     config.x = rotation[1:dim,1:dim]*config.x
 
-    return config, indices
+    return config, indices, files
 end
 
 
