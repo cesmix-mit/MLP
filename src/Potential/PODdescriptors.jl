@@ -131,7 +131,6 @@ function radialprojection(pdegree, dij, rin, rcut, scalefac, K)
             alpha = 1e-3;
         end
         x =  (1.0 .- exp.(-alpha*r/rmax))/(1.0-exp(-alpha));
-
         for i = 1:pdegree    
             a = i*pi;
             rbf[:,i+(j-1)*pdegree] = (sqrt(2.0/(rmax))/i)*fcut.*sin.(a*x)./r;
@@ -143,6 +142,9 @@ function radialprojection(pdegree, dij, rin, rcut, scalefac, K)
         n = pdegree*M+i;
         rbf[:,n] = fcut./(dij.^i);
     end
+    
+    # display(rbf)
+    # display([dij[1] rin rcut fcut[1] rbf[1]])
 
     rbfnew, U, s = eigendecomposition(rbf, dij)
     
@@ -237,6 +239,7 @@ function eigendecomposition(B, theta)
     U = U[:,ind]
 
     Bnew = B*U;
+    #display(Bnew)
     sij = theta[2:end] - theta[1:end-1];
     for i = 1:size(Bnew,2)
         B2 = Bnew[:,i].*Bnew[:,i];        
@@ -244,7 +247,10 @@ function eigendecomposition(B, theta)
         U[:,i] = U[:,i]/sqrt(area);
     end
     Bnew = B*U; 
-
+    
+    # display(Bnew)
+    # display(s')
+    # display(U)
     return Bnew, U, s 
 end
 
@@ -471,7 +477,7 @@ function twobodyefatom(x, t, a, b, c, pbc, pod::PODdesc)
             i1 = ai[n]+1
             j1 = aj[n]+1
             typei = ti[n]
-            typej = tj[n]
+            typej = tj[n]            
             mij = (ind[typei,typej]-1)*M
             for m = 1:M  
                 ms = m + mij 
@@ -845,6 +851,17 @@ function threebodyefatom(x, t, a, b, c, pbc, pod::PODdesc)
             ind[:], pairlist, pairnum, pairnumsum, atomtype, alist, Int32.(pod.pdegree), 
             Int32(ngm), Int32(nbf), Int32(nrbf), Int32(nabf), Int32(nelements), Int32(natom), 
             Int32(Nj), Int32(Nij), Int32(Nijk)) 
+
+        # eatom1 = 0.0*eatom
+        # fatom1 = 0.0*fatom    
+        # # pod3desc(eatom1, fatom1, y, x, a, b, c, pod.Phi, pod.gamma0, tmpmem, pod.rin, pod.rcut, tmpint, 
+        # #     ind[:], pairlist, pairnum, pairnumsum, atomtype, alist, Int32.(pbc), Int32.(pod.pdegree), 
+        # #     Int32(ngm), Int32(nrbf), Int32(nabf), Int32(nelements), Int32(natom)); 
+        # pod3bodydesc(eatom1, fatom1, x, a, b, c, pod.Phi, pod.gamma0, pod.rin, pod.rcut, atomtype, Int32.(pbc), 
+        #             Int32.(pod.pdegree), Int32(ngm), Int32(nrbf), Int32(nabf), Int32(nelements), Int32(natom)); 
+
+        # display([eatom[:] eatom1[:]])    
+        # display([fatom[:] fatom1[:]])    
     end            
 
     return eatom, fatom       
@@ -1841,6 +1858,37 @@ for n = 1:length(descriptors)
     end
 end    
 
+# dim, natom = size(x)
+# nrbf2 = size(descriptors[2].Phi,2)
+# nrbf3 = size(descriptors[3].Phi,2)
+# ngm = length(descriptors[2].gamma0)
+# nelements = length(descriptors[2].species)
+# nabf = descriptors[3].pdegree[3]
+# eat1 = 0.0*eatom1;
+# fat1 = 0.0*fatom1;
+# eat2 = 0.0*eatom2;
+# fat2 = 0.0*fatom2;
+# eat3 = 0.0*eatom3;
+# fat3 = 0.0*fatom3;
+# poddesc(eat1, fat1, eat2, fat2, eat3, fat3, x, a, b, c, descriptors[2].Phi, descriptors[3].Phi, 
+#         descriptors[2].gamma0, descriptors[2].rin, descriptors[2].rcut, Int32.(t[:]), Int32.(pbc), 
+#         Int32.(descriptors[2].pdegree), Int32.(descriptors[3].pdegree), Int32(ngm), Int32(nrbf2), 
+#         Int32(nrbf3), Int32(nabf), Int32(nelements), Int32(natom)); 
+# display([eatom1[:] eat1[:]])        
+# display([fatom1[:] fat1[:]])        
+# display([eatom2[:] eat2[:]])        
+# display([fatom2[:] fat2[:]])        
+# display([eatom3[:] eat3[:]])        
+# display([fatom3[:] fat3[:]])        
+# display([nrbf2 nrbf3])
+
+# display(descriptors[2].Phi)
+# display(x)
+# display(a)
+# display(b)
+# display(c)
+# error("here");
+
 # if (nbd1 == 1) & (nbd2==1) & (nbd3==1)
 #     globd = cat(globd1, globd2, dims=2)
 #     globd = cat(globd, globd3, dims=2)
@@ -1982,7 +2030,7 @@ if (nbd3==1)
     fatom33 = zeros(dim*N, M3*M3)    
     podhybrid23(globd33, fatom33, globd3, globd3, fatom3, fatom3, Int32(M3), Int32(M3), Int32(dim*N))
     globd = cat(globd, globd33, dims=2)    
-    fatom = cat(fatom, fatom33, dims=2)
+    fatom = cat(fatom, fatom33, dims=2)    
     end
 end
 
@@ -1994,7 +2042,7 @@ if (nbd2==1) & (nbd3==1)
     fatom23 = zeros(dim*N, M2*M3)    
     podhybrid23(globd23, fatom23, globd2, globd3, fatom2, fatom3, Int32(M2), Int32(M3), Int32(dim*N))
     globd = cat(globd, globd23, dims=2)    
-    fatom = cat(fatom, fatom23, dims=2)
+    fatom = cat(fatom, fatom23, dims=2)    
     end
 end
 
@@ -2031,6 +2079,10 @@ if (nbd2==1) & (nbd3==1) & (hybrid23)
     podhybrid23(globd23, fatom23, globd2, globd3, fatom2, fatom3, Int32(M2), Int32(M3), Int32(dim*N))
 
     #display([M2 M3 length(globd)])
+    # savebin("globd20",globd2[:])
+    # savebin("globd30",globd3[:])
+    # savebin("fatom20",fatom2[:])
+    # savebin("fatom30",fatom3[:])
 
     globd = cat(globd, globd23, dims=2)    
     fatom = cat(fatom, fatom23, dims=2)    
@@ -2055,7 +2107,7 @@ for i = 1:nconfigs
         normconst = 1.0/config.natom[ci]
     end    
     x, t, a, b, c, pbc, e, f = getconfig(config, natom, ci)
-    globd, fatom = podefatom(x, t, a, b, c, pbc, descriptors)
+    globd, fatom, eatom = podefatom(x, t, a, b, c, pbc, descriptors)
     
     f = f[:];
     we2 = (config.we[1]*config.we[1])*(normconst*normconst)
@@ -2067,6 +2119,16 @@ for i = 1:nconfigs
         matA += (we2*(globd'*globd) + wf2*(fatom'*fatom))    
         vecb += ((we2*e)*(globd') + wf2*(fatom'*f))    
     end
+    # display(matA)
+    # display(vecb)    
+    # savebin("Phi20.bin", descriptors[2].Phi[:]);
+    # savebin("Phi30.bin", descriptors[3].Phi[:]);
+    # savebin("A0.bin", matA[:]);
+    # savebin("b0.bin", vecb[:]);
+    # savebin("gdesc0.bin", globd[:]);
+    # savebin("gddesc0.bin", fatom[:]);
+    # savebin("eatom0.bin", eatom[:]);
+    # error("here")
 end
 
 return matA, vecb
@@ -2112,12 +2174,17 @@ function podleastsq(data, descriptors, Doptions)
             vecb += b1         
         end
     end    
-    
+        
     for i = 1:size(matA,1)
         matA[i,i] = matA[i,i]*(1.0 + 1e-12);
     end
 
     coeff = matA\vecb 
+
+    display(matA)
+    display(vecb)
+    display(coeff)
+
     return coeff, matA, vecb 
 end
 
@@ -2155,6 +2222,10 @@ function poderrors(config, descriptors, coeff, normalizeenergy)
         ssr = sum(res.^2)
         mse = ssr /N;
         frmse[i] = sqrt(mse) 
+
+        # display([e1[1] e])
+        # show(stdout, "text/plain", globd[:])
+        # error("here")
 
         # f1 = reshape(f1, (3, Int64(N/3)))
         # df = f1 - f

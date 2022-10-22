@@ -6,6 +6,23 @@ extern "C" {
 
 int neighborlist(int *ai, int *aj, int *numneigh, double *r, double rcutsq, int nx, int N, int dim);
 
+int podfullneighborlist(double *y, int *alist, int *neighlist, int *numneigh, 
+        int *numneighsum, double *x, double *a1, double *a2, double *a3, double rcut, int *pbc, int nx);
+
+void pod3desc(double *eatom, double *fatom, double *y, double *x, double *a1, double *a2, double *a3,
+             double *phi, double *gamma0, double *tmpmem, double rin, double rcut, int *tmpint, 
+            int *elemind, int *pairlist, int *pairnum, int *pairnumsum, int *atomtype, int *alist, 
+            int *pbc, int *pdegree, int ngm, int nrbf, int nabf, int nelements, int natom);
+
+void pod3bodydesc(double *eatom, double *fatom, double *x, double *a1, double *a2, double *a3,
+             double *phi, double *gamma0, double rin, double rcut, int *atomtype, 
+            int *pbc, int *pdegree, int ngm, int nrbf, int nabf, int nelements, int natom);
+
+void poddesc(double *eatom1, double *fatom1, double *eatom2, double *fatom2, double *eatom3, 
+            double *fatom3, double *x, double *a1, double *a2, double *a3, double *phi2, double *phi3, 
+            double *gamma0, double rin, double rcut, int *atomtype, int *pbc, int *pdegree2, 
+            int *pdegree3, int ngm, int nrbf2, int nrbf3, int nabf, int nelements, int natom);
+
 void bispectrumderiv(double *dbsa, double *Ar, double *Ai, double *dAr, double *dAi, double *cg, 
     int *pairnum, int *indl, int *indm, int *rowm, int K, int J, int Q, int M, int N, int Nij);
 
@@ -42,14 +59,14 @@ void cosinbasis(double *abf, double *dabf, double *xij, double *xik, int nabf, i
 void podtally2(double *eatom, double *fatom, double *vatom, double *rij, double *eij, double *fij, 
                int *ai, int *aj, int *ti, int *tj, int *ind, int S, int natom, int M, int N);
 
-void podtally2b(double *eatom, double *fatom, double *rij, double *eij, double *fij, 
+void podtally2b(double *eatom, double *fatom, double *eij, double *fij, 
                int *ai, int *aj, int *ti, int *tj, int *ind, int S, int natom, int M, int N);
 
 void podtally3(double *eatom, double *fatom, double *vatom, double *xij, double *xik, double *uij, 
              double *uik, double *uijk, double *wij, double *wik, double *wijk, int *ai, int *aj,
              int *ak, int nrbf, int nabf, int natom, int N);
 
-void podtally3b(double *eatom, double *fatom, double *xij, double *xik, double *uij, double *uik, 
+void podtally3b(double *eatom, double *fatom, double *uij, double *uik, 
                 double *uijk, double *wij, double *wik, double *wijk, int *ai, int *aj, int *ak, 
                 int *ti, int *tj, int *tk, int *ind, int nrbf, int nabf, int natom, int N, int S);
 

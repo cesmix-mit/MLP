@@ -13,8 +13,7 @@ if (length(c)>2) & (length(pbc) > 2)
     end
 end
 
-#latticemethod = 1
-
+latticemethod = 1
 if (latticemethod == 1)    
     y, alist, neighlist, neighnumsum, neighnum = latticecoords(x, rcutmax, pbc, a, b, c)
     return y, alist, neighlist, neighnumsum, neighnum
@@ -42,6 +41,7 @@ neighi, neighlist, neighnum = neighborlist(y, rcutmax, n)
 neighnumsum = Int32.([0; cumsum(neighnum)]);
 # display(maximum(abs.(neighnum1[:]-neighnum[:])))
 # display(maximum(abs.(neighlist1[:]-neighlist[:])))
+# display(neighnum)
 
 return y, alist, neighlist, neighnumsum, neighnum
 

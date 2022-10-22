@@ -185,15 +185,17 @@ function readconfigpath2(datapath, dataformat, fileextension, atomspecies, rando
     datamode = (fileextension == "bin") ? 0 : 1
         
     files = readdir(datapath)
-
+    
     j = 0;
     for i = 1:length(files)
         datafile = files[i]
         ii = findlast(".", datafile)
-        ext = datafile[(ii[end]+1):end]    
-        if (fileextension == lowercase(ext)) | (fileextension == "all")
-            j = i
-            break
+        if (ii !== nothing)
+            ext = datafile[(ii[end]+1):end]            
+            if (fileextension == lowercase(ext)) | (fileextension == "all")
+                j = i
+                break
+            end
         end
     end
     
@@ -205,12 +207,14 @@ function readconfigpath2(datapath, dataformat, fileextension, atomspecies, rando
     for i = (j+1):length(files)
         datafile = files[i]
         ii = findlast(".", datafile)
-        ext = datafile[(ii[end]+1):end]    
-        if (fileextension == lowercase(ext)) | (fileextension == "all")
-            config2 = readconfigfile(datapath, datafile, dataformat, datamode, atomspecies, transposelattice, pbc, original)
-            config2 = randomizeconfig(config2, randomize, percentage)
-            maxconfigs = max(maxconfigs,config2.nconfigs)
-            config = catconfig(config, config2)
+        if (ii !== nothing)
+            ext = datafile[(ii[end]+1):end]    
+            if (fileextension == lowercase(ext)) | (fileextension == "all")
+                config2 = readconfigfile(datapath, datafile, dataformat, datamode, atomspecies, transposelattice, pbc, original)
+                config2 = randomizeconfig(config2, randomize, percentage)
+                maxconfigs = max(maxconfigs,config2.nconfigs)
+                config = catconfig(config, config2)
+            end
         end
     end
     

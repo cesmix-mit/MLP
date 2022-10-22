@@ -890,7 +890,7 @@ function snapfourbodyefatom(x, t, a, b, c, pbc, sna)
 
     eatom = bi
     fatom = bd 
-    return eatom, fatom 
+    return eatom, fatom, blist 
 end
 
 function snapefatom(x, t, a, b, c, pbc, descriptors)
@@ -906,8 +906,16 @@ function snapefatom(x, t, a, b, c, pbc, descriptors)
             globd1 = sum(eatom1, dims=1)            
         elseif (descriptors[n].name == "SNAP") & (descriptors[n].nbody==4) 
             sna = initsnap(descriptors[n])
-            globd1, fatom1 = snapfourbodyefatom(x, t, a[:], b[:], c[:], pbc[:], sna)                
-            globd1 = reshape(globd1, (1, length(globd1)))                        
+            globd1, fatom1, eatom1 = snapfourbodyefatom(x, t, a[:], b[:], c[:], pbc[:], sna)                
+            globd1 = reshape(globd1, (1, length(globd1)))         
+            # display(x)
+            # display(eatom1)
+            # display(globd1)
+            # display(sum(eatom1, dims=1))            
+            # display(fatom1)
+            # display(sna.bzeroflag)
+            # display(sna.bnormflag)
+            # error("here")
         end
         if (n==1) 
             globd = 1.0*globd1

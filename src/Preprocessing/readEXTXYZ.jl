@@ -1,11 +1,15 @@
 function parsecomment(s)
 
-
 ii = findlast("pbc=\"T T T\"" , s)
-s = s[1:ii[1]-1] * s[(ii[end]+1):end] * " pbc=\"T T T\""
+if (ii !== nothing)
+    s = s[1:ii[1]-1] * s[(ii[end]+1):end] * " pbc=\"T T T\""
+end
 
 p = split(s, '=', keepempty=false);
 n = length(p);
+for i = 1:n
+    p[i] = strip(p[i]);
+end
 
 keys = Array{Any}(undef,n-1);
 values = Array{Any}(undef,n-1);
@@ -29,9 +33,19 @@ end
 t = split(p[n], '"', keepempty=false);
 values[n-1] = t[1];
 
+if lowercase(string(keys[end])) == "stress"     
+    t = split(values[end], '"', keepempty=false);
+    q = split(t[1], ' ', keepempty=false);
+    values[end] = map(x -> parse(Float64, x), q);
+end
+
 # display(keys)
 # display(values)
 # error("here")
+
+for i = 1:(n-1)
+    keys[i] = strip(keys[i]);
+end
 
 # handle energy
 for i = 1:n-1    
@@ -47,7 +61,7 @@ for i = 1:n-1
         values[i] = replace(values[i], "F" => "0");        
         q = split(values[i], ' ', keepempty=false);
         values[i] = map(x -> parse(Int64, x), q);        
-    end
+    end    
 end
 
 # handle properties
@@ -58,6 +72,24 @@ for i = 1:n-1
         indp = i;
         break;        
     end
+end
+
+haspbc = 0;
+for i = 1:n-1    
+    if lowercase(string(keys[i])) == "pbc"        
+        haspbc = 1;
+    end
+end
+if haspbc == 0
+    newkeys = Array{Any}(undef,n);
+    newvalues = Array{Any}(undef,n);
+    for i = 1:n-1
+        newkeys[i] = keys[i]
+        newvalues[i] = values[i]
+    end
+    newkeys[n] = "pbc";
+    newvalues[n] = [1, 1, 1];
+    return newkeys, newvalues, indp
 end
 
 return keys, values, indp
@@ -80,15 +112,22 @@ while (m<n)
     natom = parse(Int64, f[m])    
     config.natom = hcat(config.natom, reshape([natom],1,1))
 
+    # m = m + 1    
+    # ii = findlast("pbc", f[m])
+    # if ii === nothing
+    #     fm1 = f[m] * " " * f[m+1];        
+    #     keys, values, indp = parsecomment(fm1);            
+    #     m = m + 1;
+    # else
+    #     keys, values, indp = parsecomment(f[m]);    
+    # end
+
     m = m + 1    
-    ii = findlast("pbc", f[m])
-    if ii === nothing
-        fm1 = f[m] * " " * f[m+1];        
-        keys, values, indp = parsecomment(fm1);            
-        m = m + 1;
-    else
-        keys, values, indp = parsecomment(f[m]);    
-    end
+    keys, values, indp = parsecomment(f[m]);    
+
+    # display(keys)
+    # display(values)
+    # error("here")
 
     for i = 1:length(keys)
         mystr = lowercase(string(keys[i]));

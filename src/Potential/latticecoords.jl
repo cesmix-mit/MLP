@@ -117,6 +117,31 @@ function latticecoords(x, rcutmax, pbc, a, b, c)
     neighi, neighlist, neighnum = neighborlist(y, rcutmax, nx)
     neighnumsum = Int32.([0; cumsum(neighnum)]);
     
+    #display(neighnum)
+    # display(neighlist)
+    # display(y)
+    # display(a)
+    # display(b)
+    # display(c)
+    # display(pbc)
+
+# int fullneighborlist(double *y, int *alist, int *selflist, int *neighlist, int *numneigh, 
+#         int *numneighsum, double *x, double *a1, double *a2, double *a3, double rcut, int *pbc, int nx);
+    # y1 = zeros(d, nx*nl)
+    # alist1 = zeros(Int32,nx*nl);
+    # neighlist1 = zeros(Int32,nx*nx*nl);
+    # numneigh = zeros(Int32,nx);
+    # numneighsum = zeros(Int32,nx+1);
+    # count = podfullneighborlist(y1, alist1, neighlist1, numneigh, numneighsum, x, a, b, c, rcutmax, Int32.(pbc), Int32(nx));
+
+    # k = length(neighlist)    
+    # display([alist[:]-alist1[:].-1])
+    # display(y-y1)    
+    # display(neighlist-neighlist1[1:k].-1)    
+    # display(neighnum-numneigh)
+    # display([neighnumsum[:]-numneighsum[:]])
+    # display([k count])
+
     return y, alist, neighlist, neighnumsum, neighnum
 end
 

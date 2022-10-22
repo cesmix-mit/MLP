@@ -178,8 +178,8 @@ struct SHBasis
     indm::Matrix{Int32}         
     rowm::Vector{Int32}        
     #dY::Vector{Vector{Complex{Float64}}}
-end
 
+end
 function SHBasis(L::Integer)    
     alp = ALCoefficients(L)
     S = SphericalCoords(1.0, 0.0, 0.0)

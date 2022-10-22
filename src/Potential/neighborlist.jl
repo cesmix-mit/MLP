@@ -56,6 +56,7 @@ function neighborlist(r, rcut, nx)
 
     k = podneighborlist(ai, aj, numneigh, r, rcutsq, Int32(nx), Int32(N), Int32(dim));
     
+    
     ai = ai[1:k]
     aj = aj[1:k]
     

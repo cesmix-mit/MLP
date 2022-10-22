@@ -53,6 +53,24 @@ blattices, batombases = ACG.atomdisplacementconfigurations(lat, ds, N, descripto
 n = size(batombases,3)
 blattices = blattices .* ones(9, n)
 
+Preprocessing.mkfolder("results")
+
+ A1, A2, A3, Atombases = lengthgroup(lat, pranges, pdims);
+edesc, gdesc  = ACG.latticepoddescriptors(A1, A2, A3, Atombases, atomtype, descriptors)
+writedlm("results/HfO2g137n6_lengthgroup.txt", edesc);
+
+A1, A2, A3, Atombases = anglegroup(lat, aranges, adims);        
+edesc, gdesc  = ACG.latticepoddescriptors(A1, A2, A3, Atombases, atomtype, descriptors)
+writedlm("results/HfO2g137n6_anglegroup.txt", edesc);
+
+A1, A2, A3, Atombases = latticegroup(lat, lranges, ldims);
+edesc, gdesc  = ACG.latticepoddescriptors(A1, A2, A3, Atombases, atomtype, descriptors)
+writedlm("results/HfO2g137n6_latticegroup.txt", edesc);
+
+A1, A2, A3, Atombases = atomdisplacementgroup(lat, ds, N);
+edesc, gdesc  = ACG.latticepoddescriptors(A1, A2, A3, Atombases, atomtype, descriptors)
+writedlm("results/HfO2g137n6_atomgroup.txt", edesc);
+
 lattices = [dlattices[:,:,1] blattices[:,:,1]]
 atombases = cat(datombases, batombases, dims=3)
 n = size(lattices, 2);

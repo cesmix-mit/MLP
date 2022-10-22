@@ -36,6 +36,28 @@ function latticedescriptors(a1, a2, a3, atombasis, atomtype, descriptors)
     return edesc, fdesc, gdesc   
 end
 
+function latticepoddescriptors(a1, a2, a3, atombasis, atomtype, descriptors)
+
+    pbc = [1, 1, 1]
+    K = size(a1,2)    
+    N = size(atombasis,3)    
+    d, eatom = Potential.podeatom(atombasis[:,:,1], atomtype, a1[:,1], a2[:,1], a3[:,1], pbc, descriptors)
+    natom, M = size(eatom)    
+    gdesc = zeros(M, N)   
+    edesc = zeros(natom*M, N)    
+    gdesc[:,1] = d[:]    
+    edesc[:,1] = eatom[:] 
+    for n = 2:N
+        display(n)
+        k = (K == 1) ? 1 : n;
+        d, eatom = Potential.podeatom(atombasis[:,:,n], atomtype, a1[:,k], a2[:,k], a3[:,k], pbc, descriptors)
+        gdesc[:,n] = d[:]    
+        edesc[:,n] = eatom[:] 
+    end
+
+    return edesc, gdesc   
+end
+
 
 function latticesimilaritymatrices(a1, a2, a3, atombasis, atomtype, descriptors)
 

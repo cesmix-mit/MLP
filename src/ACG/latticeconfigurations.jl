@@ -84,7 +84,7 @@ if descriptors === nothing
     descriptors = PODdescriptors();
 end
 
-A1, A2, A3, Atombases = anglegroup(lat, ranges, dims);
+A1, A2, A3, Atombases = anglegroup(lat, ranges, dims);        
 
 lattices, atombases, ind = selectconfigurations(A1, A2, A3, Atombases, lat.atomtype, descriptors, tol)
 

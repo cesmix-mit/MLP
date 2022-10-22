@@ -55,7 +55,8 @@ function convert2EXTXYZ(datapath, dataformat, fileextension, species)
     original = 1
     config = readconfigpath(datapath, dataformat, fileextension, species, nothing, pbc, original)
     ii = findlast("/", datapath);        
-    filename = datapath * datapath[ii[end]:end] * ".xyz"
+    #filename = datapath * datapath[ii[end]:end] * ".xyz"
+    filename = datapath[1:ii[end]] * datapath[ii[end]:end] * ".xyz"
     writeEXTXYZ(filename, config, species)
 end
 

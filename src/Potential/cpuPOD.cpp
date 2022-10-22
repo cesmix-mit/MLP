@@ -1,14 +1,3 @@
-/***************************************************************************                               
-                    Molecular Dynamics Potentials (MDP)
-                           CESMIX-MIT Project  
- 
- Contributing authors: Ngoc-Cuong Nguyen (cuongng@mit.edu, exapde@gmail.com)
- ***************************************************************************/
-
-// clang++ -std=c++11 -Wall -Wextra -pedantic -c -fPIC cpuPOD.cpp -o cpuPOD.o
-// clang++ -shared cpuPOD.o -o cpuPOD.dylib (MacOS system)
-// clang++ -shared cpuPOD.o -o cpuPOD.so (Linux system)
-
 #ifndef CPUPOD
 #define CPUPOD
 
@@ -20,6 +9,61 @@
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
+
+void cpuCumsum(int* output, int* input, int length) 
+{
+	output[0] = 0; 
+	for (int j = 1; j < length; ++j)	
+		output[j] = input[j - 1] + output[j - 1];	
+}
+
+int latticecoords(double *y, int *alist, double *x, double *a1, double *a2, double *a3, double rcut, int *pbc, int nx)
+{
+    int m=0, n=0, p=0;
+    if (pbc[0] == 1) m = (int) ceil(rcut/a1[0]);    
+    if (pbc[1] == 1) n = (int) ceil(rcut/a2[1]);    
+    if (pbc[2] == 1) p = (int) ceil(rcut/a3[2]);                
+        
+    // index for the center lattice
+    int ind = m + (2*m+1)*(n) + (2*m+1)*(2*n+1)*(p);
+    
+    // number of lattices
+    int nl = (2*m+1)*(2*n+1)*(2*p+1);            
+    
+    //std::cout<<" "<<m<<" "<<n<<" "<<p<<" "<<nx<<" "<<nl<<" "<<ind<<std::endl;                              
+    
+    //y = zeros(3, nx*nl)
+    for (int j=0; j<3*nx; j++)
+        y[j] = x[j];
+    int q = nx;
+        
+    for (int i = 0; i < (2*p+1); i++)
+        for (int j = 0; j < (2*n+1); j++)
+            for (int k = 0; k < (2*m+1); k++) {
+                int ii = k + (2*m+1)*j + (2*m+1)*(2*n+1)*i;                
+                if (ii != ind) {                    
+                    double x0 = a1[0]*(k - m) + a2[0]*(j - n) + a3[0]*(i - p);
+                    double x1 = a1[1]*(k - m) + a2[1]*(j - n) + a3[1]*(i - p);
+                    double x2 = a1[2]*(k - m) + a2[2]*(j - n) + a3[2]*(i - p);       
+//                    std::cout<<" "<<x0<<" "<<x1<<" "<<x2<<" "<<nx<<" "<<ii<<" "<<ind<<std::endl;                              
+                    for (int jj=0; jj<nx; jj++) {
+                        y[0+3*q] = x0 + x[0+3*jj]; 
+                        y[1+3*q] = x1 + x[1+3*jj]; 
+                        y[2+3*q] = x2 + x[2+3*jj]; 
+//                        std::cout<<" "<<x[0+3*jj]<<" "<<x[1+3*jj]<<" "<<x[2+3*jj]<<" "<<nx<<" "<<jj<<" "<<q<<std::endl;                              
+                        q = q + 1;                               
+                    }
+                }
+            }                
+    
+    //alist = zeros(Int32,nx*nl)
+    for (int i=0; i <nl; i++)
+        for (int j=0; j<nx; j++) 
+            alist[j + nx*i] = j;            
+    
+    return nl;
+}
+
 
 int neighborlist(int *ai, int *aj, int *numneigh, double *r, double rcutsq, int nx, int N, int dim)
 {
@@ -42,12 +86,43 @@ int neighborlist(int *ai, int *aj, int *numneigh, double *r, double rcutsq, int 
     return k; 
 }
 
-void cpuCumsum(int* output, int* input, int length) 
+int podneighborlist(int *neighlist, int *numneigh, double *r, double rcutsq, int nx, int N, int dim)
 {
-	output[0] = 0; 
-	for (int j = 1; j < length; ++j)	
-		output[j] = input[j - 1] + output[j - 1];	
+    int k = 0;
+    for (int i = 0; i<nx; i++) {
+        double *ri = &r[i*dim];
+        int inc = 0;
+        for (int j=0; j<N; j++) {
+            double *rj = &r[dim*j];                        
+            double rijsq = (ri[0]-rj[0])*(ri[0]-rj[0]) + (ri[1]-rj[1])*(ri[1]-rj[1]) + (ri[2]-rj[2])*((ri[2]-rj[2]));
+            if  ((rijsq > 1e-12) && (rijsq <= rcutsq))  { 
+                inc += 1;                                
+                neighlist[k] = j;          
+                k += 1;                                                  
+            }
+        }
+        numneigh[i] = inc; 
+    }
+    return k; 
 }
+
+int podfullneighborlist(double *y, int *alist, int *neighlist, int *numneigh, int *numneighsum, 
+        double *x, double *a1, double *a2, double *a3, double rcut, int *pbc, int nx)
+{
+    double rcutsq = rcut*rcut;    
+    int dim = 3, nl = 0, nn = 0;
+    
+    // number of lattices
+    nl = latticecoords(y, alist, x, a1, a2, a3, rcut, pbc, nx);        
+    int N = nx*nl;
+            
+    // total number of neighbors
+   nn = podneighborlist(neighlist, numneigh, y, rcutsq, nx, N, dim);
+    
+   cpuCumsum(numneighsum, numneigh, nx+1); 
+       
+   return nn;
+}   
 
 void podhybrid23(double* d23, double *dd23, double* d2, double *d3, double* dd2, double *dd3, 
         int M2, int M3, int N)
@@ -655,7 +730,7 @@ void podtally2(double *eatom, double *fatom, double *vatom, double *rij, double 
     }
 }
 
-void podtally2b(double *eatom, double *fatom, double *rij, double *eij, double *fij, 
+void podtally2b(double *eatom, double *fatom, double *eij, double *fij, 
                int *ai, int *aj, int *ti, int *tj, int *ind, int S, int natom, int M, int N)
 {
     for (int n=0; n<N; n++) {
@@ -730,7 +805,7 @@ void podtally3b0(double *eatom, double *uij, double *uik, double *uijk, int *ai,
     }
 }
 
-void podtally3b(double *eatom, double *fatom, double *xij, double *xik, double *uij, double *uik, 
+void podtally3b(double *eatom, double *fatom, double *uij, double *uik, 
                 double *uijk, double *wij, double *wik, double *wijk, int *ai, int *aj, int *ak, 
                 int *ti, int *tj, int *tk, int *ind, int nrbf, int nabf, int natom, int N, int S)
 {
@@ -901,6 +976,41 @@ void matmul(double *c, double *a, double *b, int r1, int c1, int c2)
                 c[i + r1*j] += a[i + r1*k] * b[k + c1*j];            
 }
 
+void pod1body(double *eatom, double *fatom, int *atomtype, int nelements, int natom)
+{
+    for (int m=1; m<=nelements; m++)       
+        for (int i=0; i<natom; i++)         
+            eatom[i + natom*(m-1)] = (atomtype[i] == m) ? 1.0 : 0.0;
+        
+    for (int i=0; i<3*natom*nelements; i++)  
+        fatom[i] = 0.0;
+}
+
+void pod2body(double *eatom, double *fatom, double *y, double *phi, double *gamma0, double *tmpmem, 
+             double rin, double rcut, int *tmpint, int *ind, int *pairlist, int *pairnumsum, int *atomtype, 
+             int *alist, int *pdegree, int ngm, int nbf, int nrbf, int nelements, int natom, int Nij)
+{
+    int dim = 3;
+    
+    double *rij = &tmpmem[0]; // 3*Nij
+    int *ai = &tmpint[0];     // Nij
+    int *aj = &tmpint[Nij];   // Nij 
+    int *ti = &tmpint[2*Nij]; // Nij
+    int *tj = &tmpint[3*Nij]; // Nij
+    cpuNeighPairs(rij, y, ai, aj, ti, tj, pairlist, pairnumsum, atomtype, 
+                alist, natom, dim);
+
+    double *e2ij = &tmpmem[3*Nij]; // Nij*nrbf
+    double *f2ij = &tmpmem[3*Nij+Nij*nrbf]; // dim*Nij*nrbf
+    double *e2ijt = &tmpmem[3*Nij+4*Nij*nrbf]; // Nij*nbf
+    double *f2ijt = &tmpmem[3*Nij+4*Nij*nrbf+Nij*nbf]; // dim*Nij*nbf    
+    radialbasis(e2ijt, f2ijt, rij, gamma0, rin, rcut-rin, pdegree[0], pdegree[1], ngm, Nij);
+    matmul(e2ij, e2ijt, phi, Nij, nbf, nrbf);
+    matmul(f2ij, f2ijt, phi, 3*Nij, nbf, nrbf);
+        
+    podtally2b(eatom, fatom, e2ij, f2ij, ai, aj, ti, tj, ind, nelements, natom, nrbf, Nij);   
+}
+
 void pod3body(double *eatom, double *fatom, double *y, double *phi, double *gamma0, double *tmpmem, 
              double rin, double rcut, int *tmpint, int *ind, int *pairlist, int *pairnum, 
              int *pairnumsum, int *atomtype, int *alist, int *pdegree, int ngm, int nbf, 
@@ -980,11 +1090,160 @@ void pod3body(double *eatom, double *fatom, double *y, double *phi, double *gamm
     double *wijk = &tmpmem[n+Nijk*nabf]; // 6*Nijk*nabf
     cosinbasis(uijk, wijk, xij, xik, nabf, Nijk);
 
-    podtally3b(eatom, fatom, xij, xik, uij, uik, uijk, wij, wik, wijk, ai, aj, ak, 
+    podtally3b(eatom, fatom, uij, uik, uijk, wij, wik, wijk, ai, aj, ak, 
         ti, tj, tk, ind, nrbf, nabf, natom, Nijk, nelements);   
 
     //n = 3*Nij+ (1+dim)*Nij*nrbf + 2*(1+dim)*Nijk*nrbf + 4*Nj*nrbf + 2*dim*Nijk + 7*Nijk*nabf;
     //m = 4*Nij + 2*natom+1 + 2*Nijk + (Nj-1)*Nj + 6*Nijk;
+}
+
+void pod3desc(double *eatom, double *fatom, double *y, double *x, double *a1, double *a2, double *a3,
+             double *phi, double *gamma0, double *tmpmem, double rin, double rcut, int *tmpint, 
+            int *elemind, int *pairlist, int *pairnum, int *pairnumsum, int *atomtype, int *alist, 
+            int *pbc, int *pdegree, int ngm, int nrbf, int nabf, int nelements, int natom)
+{
+    int Nj=0, Nij=0, Nijk=0;
+    Nij = podfullneighborlist(y, alist, pairlist, pairnum, pairnumsum, x, a1, a2, a3, rcut, pbc, natom);
+    
+    if (Nij>0) {
+        int nbf = pdegree[0]*ngm + pdegree[1];
+        
+        for (int i=0; i < natom; i++) {
+            Nj = (Nj > pairnum[i]) ? Nj : pairnum[i];
+            Nijk +=  (pairnum[i]-1)*pairnum[i]/2;
+        }
+
+        int k = 1;
+        for (int i=0; i < nelements; i++) 
+            for (int j=0; j < nelements; j++) {
+                elemind[i + nelements*j] = k;
+                elemind[j + nelements*i] = k;
+                k += 1;
+            }            
+        
+        pod3body(eatom, fatom, y, phi, gamma0, tmpmem, rin, rcut, tmpint, 
+                 elemind, pairlist, pairnum, pairnumsum, atomtype, alist, pdegree, 
+                 ngm, nbf, nrbf, nabf, nelements, natom, Nj, Nij, Nijk); 
+    }
+}
+
+void pod3bodydesc(double *eatom, double *fatom, double *x, double *a1, double *a2, double *a3,
+             double *phi, double *gamma0, double rin, double rcut, int *atomtype, 
+            int *pbc, int *pdegree, int ngm, int nrbf, int nabf, int nelements, int natom)
+{
+    int Nj=0, Nij=0, Nijk=0;
+    int m=0, n=0, p=0, dim=3;
+    if (pbc[0] == 1) m = (int) ceil(rcut/a1[0]);    
+    if (pbc[1] == 1) n = (int) ceil(rcut/a2[1]);    
+    if (pbc[2] == 1) p = (int) ceil(rcut/a3[2]);                
+    // number of lattices
+    int nl = (2*m+1)*(2*n+1)*(2*p+1);      
+    
+    double *y, *tmpmem;    
+    int *alist, *pairlist, *pairnum, *pairnumsum, *elemind, *tmpint;
+    y = (double*) malloc (sizeof (double)*(dim*natom*nl));
+    alist = (int*) malloc (sizeof (int)*(natom*nl));    
+    pairnum = (int*) malloc (sizeof (int)*(natom));
+    pairnumsum = (int*) malloc (sizeof (int)*(natom+1));
+    pairlist = (int*) malloc (sizeof (int)*(natom*MIN(natom*nl,1000)));
+    elemind = (int*) malloc (sizeof (int)*(nelements*nelements));
+    
+    Nij = podfullneighborlist(y, alist, pairlist, pairnum, pairnumsum, x, a1, a2, a3, rcut, pbc, natom);
+
+    if (Nij>0) {
+        int nbf = pdegree[0]*ngm + pdegree[1];                       
+        for (int i=0; i < natom; i++) {
+            Nj = (Nj > pairnum[i]) ? Nj : pairnum[i];
+            Nijk +=  (pairnum[i]-1)*pairnum[i]/2;
+        }
+                
+        int szd = 3*Nij+ (1+dim)*Nij*(nrbf+nbf) + 2*(1+dim)*Nijk*nrbf + 4*Nj*nrbf + 2*dim*Nijk + 7*Nijk*nabf;
+        int szi = 4*Nij + 2*natom+1 + 2*Nijk + (Nj-1)*Nj + 6*Nijk;
+        tmpmem = (double*) malloc (sizeof (double)*(szd));
+        tmpint = (int*) malloc (sizeof (int)*(szi));
+        
+        int k = 1;
+        for (int i=0; i < nelements; i++) 
+            for (int j=0; j < nelements; j++) {
+                elemind[i + nelements*j] = k;
+                elemind[j + nelements*i] = k;
+                k += 1;
+            }            
+
+        pod3body(eatom, fatom, y, phi, gamma0, tmpmem, rin, rcut, tmpint, 
+                elemind, pairlist, pairnum, pairnumsum, atomtype, alist, pdegree, 
+                ngm, nbf, nrbf, nabf, nelements, natom, Nj, Nij, Nijk); 
+        
+        free(tmpint); free(tmpmem);
+    }
+    
+    free(y); free(alist); free(pairlist); free(pairnum); free(pairnumsum); free(elemind);    
+}
+
+void poddesc(double *eatom1, double *fatom1, double *eatom2, double *fatom2, double *eatom3, 
+            double *fatom3, double *x, double *a1, double *a2, double *a3, double *phi2, double *phi3, 
+            double *gamma0, double rin, double rcut, int *atomtype, int *pbc, int *pdegree2, 
+            int *pdegree3, int ngm, int nrbf2, int nrbf3, int nabf, int nelements, int natom)
+{
+    int Nj=0, Nij=0, Nijk=0;
+    int m=0, n=0, p=0, dim=3;
+    if (pbc[0] == 1) m = (int) ceil(rcut/a1[0]);    
+    if (pbc[1] == 1) n = (int) ceil(rcut/a2[1]);    
+    if (pbc[2] == 1) p = (int) ceil(rcut/a3[2]);                
+    // number of lattices
+    int nl = (2*m+1)*(2*n+1)*(2*p+1);      
+    
+    double *y, *tmpmem;    
+    int *alist, *pairlist, *pairnum, *pairnumsum, *elemind, *tmpint;
+    y = (double*) malloc (sizeof (double)*(dim*natom*nl));
+    alist = (int*) malloc (sizeof (int)*(natom*nl));    
+    pairnum = (int*) malloc (sizeof (int)*(natom));
+    pairnumsum = (int*) malloc (sizeof (int)*(natom+1));
+    pairlist = (int*) malloc (sizeof (int)*(natom*MIN(natom*nl,1000)));
+    elemind = (int*) malloc (sizeof (int)*(nelements*nelements));
+    
+    // neighbor list
+    Nij = podfullneighborlist(y, alist, pairlist, pairnum, pairnumsum, x, a1, a2, a3, rcut, pbc, natom);
+    
+    // one-body descriptors
+    pod1body(eatom1, fatom1, atomtype, nelements, natom);
+    
+    if (Nij>0) {
+        int nbf2 = pdegree2[0]*ngm + pdegree2[1];
+        int nbf3 = pdegree3[0]*ngm + pdegree3[1];
+        
+        for (int i=0; i < natom; i++) {
+            Nj = (Nj > pairnum[i]) ? Nj : pairnum[i];
+            Nijk +=  (pairnum[i]-1)*pairnum[i]/2;
+        }
+
+        int szd = 3*Nij+ (1+dim)*Nij*(nrbf3+nbf3) + 2*(1+dim)*Nijk*nrbf3 + 4*Nj*nrbf3 + 2*dim*Nijk + 7*Nijk*nabf;
+        int szi = 4*Nij + 2*natom+1 + 2*Nijk + (Nj-1)*Nj + 6*Nijk;
+        tmpmem = (double*) malloc (sizeof (double)*(szd));
+        tmpint = (int*) malloc (sizeof (int)*(szi));
+        
+        int k = 1;
+        for (int i=0; i < nelements; i++) 
+            for (int j=i; j < nelements; j++) {
+                elemind[i + nelements*j] = k;
+                elemind[j + nelements*i] = k;
+                k += 1;
+            }            
+        
+        // two-body descriptors
+        pod2body(eatom2, fatom2, y, phi2, gamma0, tmpmem, rin, rcut, tmpint, 
+                 elemind, pairlist, pairnumsum, atomtype, alist, pdegree2, 
+                 ngm, nbf2, nrbf2, nelements, natom, Nij); 
+        
+        // three-body descriptors
+        pod3body(eatom3, fatom3, y, phi3, gamma0, tmpmem, rin, rcut, tmpint, 
+                 elemind, pairlist, pairnum, pairnumsum, atomtype, alist, pdegree3, 
+                 ngm, nbf3, nrbf3, nabf, nelements, natom, Nj, Nij, Nijk); 
+        
+        free(tmpint); free(tmpmem);
+    }
+    
+    free(y); free(alist); free(pairlist); free(pairnum); free(pairnumsum); free(elemind);    
 }
 
 void pod3body0(double *eatom, double *y, double *phi, double *gamma0, double *tmpmem, 
